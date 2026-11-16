@@ -1,6 +1,9 @@
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.cache import patch_vary_headers
 
@@ -24,22 +27,29 @@ def _wants_fragment(request) -> bool:
 
 
 def _own_entry_or_404(request, pk) -> LibraryEntry:
-    """The signed-in user's entry with this pk; anyone else's is a 404."""
-    return get_object_or_404(
-        LibraryEntry.objects.select_related("game", "platform"),
-        pk=pk,
-        user=request.user,
-    )
+    """The signed-in user's entry with this pk, for editing.
 
-
-@login_required
-def my_library(request):
-    """The signed-in user's saved games, from local data only.
-
-    Search, filters and sort come from the shared ``EntryFilter``. HTMX
-    requests get only the results grid; everything else gets the full page.
+    Anyone else is refused: a 403 if the entry is in a Public library (its
+    existence is no secret), and a 404 if it's Private, so a Private library
+    stays indistinguishable from one that doesn't exist.
     """
-    own_entries = LibraryEntry.objects.filter(user=request.user)
+    entry = get_object_or_404(
+        LibraryEntry.objects.select_related("game", "platform", "user"), pk=pk
+    )
+    if entry.user == request.user:
+        return entry
+    if entry.user.library_is_public:
+        raise PermissionDenied
+    raise Http404
+
+
+def _browse(request, owner, template, extra_context=None):
+    """Search, filter, sort and page one user's library, from local data only.
+
+    HTMX requests get only the results grid; everything else gets the full
+    page. Shared by My Library and the shared library page.
+    """
+    own_entries = LibraryEntry.objects.filter(user=owner)
     filterset = EntryFilter(
         request.GET, queryset=own_entries.select_related("game", "platform")
     )
@@ -49,15 +59,51 @@ def my_library(request):
         "page": page,
         "entries": page.object_list,
         "library_is_empty": not own_entries.exists(),
+        "library_owner": owner,
+        **(extra_context or {}),
     }
     if _wants_fragment(request):
         template = "library/partials/library_results.html"
-    else:
-        template = "library/my_library.html"
     response = render(request, template, context)
     # Browsers must not reuse a cached fragment for a full page load.
     patch_vary_headers(response, ["HX-Request"])
     return response
+
+
+@login_required
+def my_library(request):
+    """The signed-in user's saved games, with edit links."""
+    return _browse(request, request.user, "library/my_library.html")
+
+
+def _visible_library_owner_or_404(request, username):
+    """The owner of the library at /u/<username>/, if the viewer may see it.
+
+    A Private library is visible only to its owner. To everyone else it
+    raises the same 404 as a username that doesn't exist, so nobody can tell
+    the account is there.
+    """
+    owner = get_user_model().objects.filter(username=username).first()
+    if owner is None or not (owner.library_is_public or owner == request.user):
+        raise Http404
+    return owner
+
+
+def shared_library(request, username):
+    """A read-only view of someone's library, with the same browsing."""
+    owner = _visible_library_owner_or_404(request, username)
+    return _browse(request, owner, "library/shared_library.html", {"read_only": True})
+
+
+def shared_entry_detail(request, username, pk):
+    """A read-only detail page for one entry in a shared library."""
+    owner = _visible_library_owner_or_404(request, username)
+    entry = get_object_or_404(
+        LibraryEntry.objects.select_related("game", "platform"), pk=pk, user=owner
+    )
+    return render(
+        request, "library/entry_detail.html", {"entry": entry, "read_only": True}
+    )
 
 
 @login_required

@@ -10,22 +10,7 @@
     <span>Your library is empty. <a href="{% url 'games:home' %}" class="link">Search for a game</a> and add it with one click.</span>
   </div>
 {% else %}
-  {# A plain GET form; HTMX swaps only the results and pushes the URL. #}
-  <form action="{{ request.path }}" method="get" role="search" aria-label="Filter your library"
-        class="filter-bar mb-6"
-        hx-get="{{ request.path }}" hx-target="#library-results" hx-push-url="true"
-        hx-trigger="submit, change" hx-sync="this:replace">
-    {% for field in filterset.form %}
-      <div>
-        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-        {{ field }}
-      </div>
-    {% endfor %}
-    <div class="flex gap-2 sm:col-span-2 lg:col-span-3">
-      <button type="submit" class="btn btn-primary">Apply</button>
-      <a href="{{ request.path }}" class="btn btn-ghost">Clear</a>
-    </div>
-  </form>
+  {% include "library/partials/filter_bar.html" %}
 
   <div id="library-results">
     {% include "library/partials/library_results.html" %}

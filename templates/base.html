@@ -15,9 +15,8 @@
     <ul class="menu menu-horizontal items-center gap-1">
       <li><a href="{% url 'games:home' %}">Search</a></li>
       {% if user.is_authenticated %}
-        {# The Settings page arrives in Phase 6; switch it to {% url %} then. #}
         <li><a href="{% url 'library:my_library' %}">My Library</a></li>
-        <li><a href="/settings/">Settings</a></li>
+        <li><a href="{% url 'accounts:settings' %}">Settings</a></li>
         <li>
           <form method="post" action="{% url 'accounts:logout' %}">
             {% csrf_token %}

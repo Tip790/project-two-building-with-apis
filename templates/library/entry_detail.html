@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{{ entry.game.name }} · My Library · Game Backlog Tracker{% endblock %}
+{% block title %}{{ entry.game.name }} · {% if read_only %}{{ entry.user.username }}'s library{% else %}My Library{% endif %} · Game Backlog Tracker{% endblock %}
 
 {% block content %}
 {% with game=entry.game %}
+{% if read_only %}
+<p class="mb-4"><a href="{% url 'shared:library' entry.user.username %}" class="link">« Back to {{ entry.user.username }}'s library</a></p>
+{% else %}
 <p class="mb-4"><a href="{% url 'library:my_library' %}" class="link">« Back to My Library</a></p>
+{% endif %}
 
 <div class="grid gap-6 lg:grid-cols-2">
   <article class="card bg-base-100 shadow-sm overflow-hidden" data-testid="game-details">
@@ -35,6 +39,32 @@
     </div>
   </article>
 
+{% if read_only %}
+  {# Visitors see the owner's tracking with no edit controls. #}
+  <div class="card bg-base-100 shadow-sm self-start" data-testid="owner-tracking">
+    <div class="card-body">
+      <h2 class="card-title">{{ entry.user.username }}'s tracking</h2>
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+        <dt class="font-medium">Status</dt>
+        <dd>{{ entry.get_status_display }}</dd>
+        <dt class="font-medium">Rating</dt>
+        <dd>{% if entry.rating %}<span aria-label="Rated {{ entry.rating }} out of 5">{{ entry.rating }}/5 ★</span>{% else %}Unrated{% endif %}</dd>
+        <dt class="font-medium">Hours played</dt>
+        <dd>{% if entry.hours_played is not None %}{{ entry.hours_played|floatformat:"-1" }} h{% else %}Not recorded{% endif %}</dd>
+        <dt class="font-medium">Platform</dt>
+        <dd>{{ entry.platform.name|default:"Not set" }}</dd>
+      </dl>
+      <h3 class="font-medium mt-2">Notes</h3>
+      {% if entry.notes %}<div class="text-sm space-y-2">{{ entry.notes|linebreaks }}</div>{% else %}<p class="text-sm opacity-70">No notes.</p>{% endif %}
+      {% if entry.user == user %}
+        <div class="card-actions mt-2">
+          <a href="{% url 'library:entry_detail' entry.pk %}" class="link">Edit in My Library</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% else %}
   <div class="space-y-6">
     {% include "library/partials/entry_form.html" %}
 
@@ -61,5 +91,6 @@
   </div>
   <form method="dialog" class="modal-backdrop"><button>Close</button></form>
 </dialog>
+{% endif %}
 {% endwith %}
 {% endblock %}

@@ -11,7 +11,7 @@
         </figure>
         <div class="card-body p-4">
           <h2 class="card-title text-base">
-            <a href="{% url 'library:entry_detail' entry.pk %}" class="link link-hover">{{ entry.game.name }}</a>
+            <a href="{% if read_only %}{% url 'shared:entry_detail' library_owner.username entry.pk %}{% else %}{% url 'library:entry_detail' entry.pk %}{% endif %}" class="link link-hover">{{ entry.game.name }}</a>
           </h2>
           <p class="text-sm opacity-70">{{ entry.game.released.year|default:"Release year unknown" }}</p>
           <div class="flex flex-wrap gap-2">
@@ -40,6 +40,6 @@
   {% endif %}
 {% else %}
   <div role="alert" class="alert">
-    <span>No games in your library match these filters. <a href="{{ request.path }}" class="link">Clear the filters</a>.</span>
+    <span>No games in {% if read_only %}this{% else %}your{% endif %} library match these filters. <a href="{{ request.path }}" class="link">Clear the filters</a>.</span>
   </div>
 {% endif %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Settings · Game Backlog Tracker{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-6">Settings</h1>
+
+<section class="card bg-base-100 shadow-sm max-w-2xl" aria-labelledby="sharing-heading">
+  <div class="card-body">
+    <h2 id="sharing-heading" class="card-title">Sharing</h2>
+    <p class="text-sm">
+      Your library is
+      <strong data-testid="library-visibility">{% if user.library_is_public %}Public{% else %}Private{% endif %}</strong>.
+      {% if user.library_is_public %}
+        Anyone with the link below can view it read-only.
+      {% else %}
+        Only you can see it; to everyone else the link below shows Not Found.
+      {% endif %}
+    </p>
+    <form method="post" action="{% url 'accounts:settings' %}" class="space-y-4">
+      {% csrf_token %}
+      <label class="flex items-center gap-3 cursor-pointer" for="{{ form.library_is_public.id_for_label }}">
+        {{ form.library_is_public }}
+        <span>{{ form.library_is_public.label }}</span>
+      </label>
+      <button type="submit" class="btn btn-primary">Save sharing</button>
+    </form>
+    <div>
+      <label for="share-link" class="font-medium text-sm">Your share link</label>
+      <div class="flex gap-2 mt-1">
+        <input id="share-link" type="text" readonly value="{{ share_url }}" class="input input-bordered w-full" onfocus="this.select()">
+        <a href="{{ share_url }}" class="btn">Open</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

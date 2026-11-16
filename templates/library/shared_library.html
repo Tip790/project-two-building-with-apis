@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}{{ library_owner.username }}'s library · Game Backlog Tracker{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-2">{{ library_owner.username }}'s library</h1>
+{% if library_owner == user %}
+  <p class="mb-6 text-sm opacity-70" data-testid="owner-preview">
+    This is how others see your library{% if not library_owner.library_is_public %} — but it's Private, so to everyone else this link shows Not Found{% endif %}.
+    <a href="{% url 'library:my_library' %}" class="link">Edit it in My Library</a>.
+  </p>
+{% else %}
+  <p class="mb-6 text-sm opacity-70">A read-only view of a shared library.</p>
+{% endif %}
+
+{% if library_is_empty %}
+  <div role="alert" class="alert">
+    <span>{{ library_owner.username }} hasn't saved any games yet.</span>
+  </div>
+{% else %}
+  {% include "library/partials/filter_bar.html" %}
+  <div id="library-results">
+    {% include "library/partials/library_results.html" %}
+  </div>
+{% endif %}
+{% endblock %}
