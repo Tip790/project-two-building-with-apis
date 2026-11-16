@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ entry.game.name }} · My Library · Game Backlog Tracker{% endblock %}
+
+{% block content %}
+{% with game=entry.game %}
+<p class="mb-4"><a href="{% url 'library:my_library' %}" class="link">« Back to My Library</a></p>
+
+<div class="grid gap-6 lg:grid-cols-2">
+  <article class="card bg-base-100 shadow-sm overflow-hidden" data-testid="game-details">
+    <figure class="aspect-video bg-base-300">
+      <img src="{% if game.background_image %}{{ game.background_image }}{% else %}{% static 'img/cover-placeholder.svg' %}{% endif %}"
+           alt="Cover of {{ game.name }}" class="w-full h-full object-cover"
+           onerror="this.onerror=null;this.src='{% static 'img/cover-placeholder.svg' %}';">
+    </figure>
+    <div class="card-body">
+      <h1 class="card-title text-2xl">{{ game.name }}</h1>
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+        <dt class="font-medium">Released</dt>
+        <dd>{{ game.released|date:"F j, Y"|default:"Unknown" }}</dd>
+        <dt class="font-medium">Metacritic</dt>
+        <dd>{{ game.metacritic|default:"No score" }}</dd>
+        <dt class="font-medium">Genres</dt>
+        <dd>{% for genre in game.genres.all %}{{ genre.name }}{% if not forloop.last %}, {% endif %}{% empty %}None listed{% endfor %}</dd>
+        <dt class="font-medium">Platforms</dt>
+        <dd>{% for platform in game.platforms.all %}{{ platform.name }}{% if not forloop.last %}, {% endif %}{% empty %}None listed{% endfor %}</dd>
+      </dl>
+      {% if game.description %}
+        <div class="prose-sm mt-2 space-y-2">{{ game.description|linebreaks }}</div>
+      {% endif %}
+      <div class="card-actions mt-2">
+        <a href="https://rawg.io/games/{{ game.slug }}" class="link" target="_blank" rel="noopener">View on RAWG</a>
+      </div>
+    </div>
+  </article>
+
+  <div class="space-y-6">
+    {% include "library/partials/entry_form.html" %}
+
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body">
+        <h2 class="card-title">Remove from library</h2>
+        <p class="text-sm opacity-70">Deletes your tracking for this game. The game stays available to search and add again.</p>
+        {# Opens the modal with JavaScript; without it, the link goes to a confirmation page. #}
+        <a href="{% url 'library:entry_delete' entry.pk %}" class="btn btn-error btn-outline self-start"
+           onclick="document.getElementById('delete-modal').showModal(); return false;">Remove…</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<dialog id="delete-modal" class="modal">
+  <div class="modal-box">
+    <h3 class="text-lg font-bold">Remove {{ game.name }}?</h3>
+    <div class="py-4">{% include "library/partials/delete_confirm_body.html" %}</div>
+    <div class="modal-action">
+      <form method="dialog"><button class="btn">Cancel</button></form>
+      {% include "library/partials/delete_form.html" %}
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>Close</button></form>
+</dialog>
+{% endwith %}
+{% endblock %}

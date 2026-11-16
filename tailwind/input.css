@@ -20,6 +20,12 @@
   .form-stack input:not([type="hidden"]):not([type="checkbox"]) {
     @apply input w-full;
   }
+  .form-stack select {
+    @apply select w-full;
+  }
+  .form-stack textarea {
+    @apply textarea w-full;
+  }
   .form-stack .helptext,
   .form-stack .helptext ul {
     @apply text-sm opacity-70;

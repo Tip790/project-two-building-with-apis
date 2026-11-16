@@ -28,6 +28,52 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 4 (entry detail, edit, and delete) with three TDD behaviors
+
+### Prompts
+1. `/implement` @prd/game-backlog-tracker.md @plans/game-backlog-tracker.md Implement phase 4
+2. go ahead
+3. the test is right, make it pass
+4. move to behavior 2
+5. the test is right, make it pass
+6. move to behavior 3
+7. make it green
+8. continue with the rest of phase 4
+9. manual verification passed, log it and commit
+
+### Summary
+- **Outcome:** Phase 4 of the plan is built:
+  - **Shared validation:** `library/validation.py` has `validate_platform_for_game(game, platform)`. It raises a `ValidationError` on the `platform` field ("Hades isn't available on Xbox One.") and allows no platform. `LibraryEntry.clean()` calls it, so the website form and the admin use it, and Phase 8's serializer can too.
+  - **Edit form:** `library/forms.py` has `EntryForm` for status, rating, hours played, platform and notes. The dropdown lists only the game's platforms, but the field accepts any platform, so a foreign one reaches the shared validator and gets the same message the API will give.
+  - **Detail page:** `/library/<pk>/` shows the stored cover (with the placeholder fallback), name, release date, Metacritic score, genres, platforms and description, plus a "View on RAWG" link built from the slug. It renders from local data only.
+  - **Save:** HTMX saves return the form partial (`templates/library/partials/entry_form.html`) with a "Saved." alert or inline errors. A plain POST flashes "Saved." and redirects back, and on errors re-renders the full page.
+  - **Delete:** a DaisyUI modal on the detail page. Without JavaScript, the link opens a confirmation page at `/library/<pk>/delete/`. Confirming removes only the entry (the shared game stays) and redirects to My Library.
+  - **Owner-only access:** both views look entries up through `_own_entry_or_404`, so another user's entry is a 404.
+  - **My Library:** cards link to their detail pages.
+  - **CSS:** `tailwind/input.css` styles selects and textareas in `.form-stack`, and `static/css/app.css` was rebuilt.
+
+  TDD covered three behaviors, each RED → approved → GREEN:
+  1. the shared validator rejects a platform the game isn't on
+  2. an HTMX save returns "Saved." and stores the changes, or inline errors and stores nothing
+  3. another user's entry is 404 for view, save, delete-confirm and delete, and stays unchanged
+
+  All 113 tests pass, and Ruff lint and format are clean. The user confirmed manual browser verification passed.
+- **Deviations:** The user approved each TDD test unchanged, and no recommendations were overridden. Decisions made during the phase that the PRD doesn't specify:
+  - Delete lives at `/library/<pk>/delete/`, a sub-path of the plan's detail URL. A GET there is the no-JavaScript confirmation page.
+  - Until Phase 6, every non-owner gets a 404 on `/library/<pk>/`. Phase 6 changes Public-library entries to a 403, in `_own_entry_or_404`.
+  - HTMX saves with errors return status 200, because HTMX doesn't swap 4xx responses by default.
+  - After a failed save, the entry is reloaded from the database, so half-applied values never show on the page.
+  - Rating is a number field (1–5), not a dropdown, so out-of-range values get the model's own message, matching the API.
+- **Sideways:**
+  - Behaviors 2 and 3 were built with the views on purpose unfinished (POST not handled, lookup by `pk` alone), so each test failed on an assertion first.
+  - The new non-TDD tests were appended in one shell step, which left their imports missing at first. They were added before the first run.
+  - A grep check reported 0 matches for `.textarea` in the compiled CSS. The styles were there under `.form-stack textarea`, because `@apply` inlines them. The grep pattern was wrong.
+  - The first `PROMPTS.md` edit failed again on the wrong indentation in the matched text. This time it was caught and fixed before committing.
+  - Known gaps:
+    - Nothing exercises the delete modal's JavaScript in a real browser (only its markup is checked).
+    - The browser's own min/max checks stop most out-of-range values before the server sees them, so the server messages show mainly without those checks.
+    - The 403 for Public-library edits waits for Phase 6.
+
 ## 2026-11-16 — Implemented Phase 3 (add to library + minimal My Library) with three TDD behaviors
 
 ### Prompts

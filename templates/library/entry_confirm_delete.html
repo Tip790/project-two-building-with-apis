@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Remove {{ entry.game.name }}? · Game Backlog Tracker{% endblock %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-sm w-full max-w-md mx-auto">
+  <div class="card-body">
+    <h1 class="card-title text-2xl">Remove {{ entry.game.name }}?</h1>
+    {% include "library/partials/delete_confirm_body.html" %}
+    <div class="card-actions justify-end mt-2">
+      <a href="{% url 'library:entry_detail' entry.pk %}" class="btn">Cancel</a>
+      {% include "library/partials/delete_form.html" %}
+    </div>
+  </div>
+</div>
+{% endblock %}

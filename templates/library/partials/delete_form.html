@@ -1,0 +1,4 @@
+<form method="post" action="{% url 'library:entry_delete' entry.pk %}">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-error">Remove from library</button>
+</form>

@@ -4,6 +4,8 @@ from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from .validation import validate_platform_for_game
+
 MAX_HOURS = Decimal("10000")
 
 
@@ -75,3 +77,7 @@ class LibraryEntry(models.Model):
 
     def __str__(self):
         return f"{self.user} – {self.game}"
+
+    def clean(self):
+        if self.game_id is not None:
+            validate_platform_for_game(self.game, self.platform)

@@ -17,7 +17,9 @@
                onerror="this.onerror=null;this.src='{% static 'img/cover-placeholder.svg' %}';">
         </figure>
         <div class="card-body p-4">
-          <h2 class="card-title text-base">{{ entry.game.name }}</h2>
+          <h2 class="card-title text-base">
+            <a href="{% url 'library:entry_detail' entry.pk %}" class="link link-hover">{{ entry.game.name }}</a>
+          </h2>
           <p class="text-sm opacity-70">{{ entry.game.released.year|default:"Release year unknown" }}</p>
           <span class="badge badge-outline">{{ entry.get_status_display }}</span>
         </div>
