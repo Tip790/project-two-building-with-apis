@@ -28,6 +28,52 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Broke the game backlog tracker PRD into a 9-phase tracer-bullet plan and committed the design documents
+
+### Prompts
+1. `/prd-to-plan` @prd/game-backlog-tracker.md
+2. merge the suggested merges then display the phases again
+3. are there any more merges possible that you would recommend?
+4. write the 9 phases
+5. commit the PRD, Plan, Grill-me, and the prototype
+6. Append a session log to PROMPTS.md at the repo root, under today's date, newest entry at the top. Record every prompt I gave you this session, in order, including any corrections. End the entry with a short summary: the outcome, any places where I deviated from a recommended answer or asked follow-up questions, and anything that went sideways.
+
+### Summary
+- **Outcome:** Wrote `plans/game-backlog-tracker.md`, a 9-phase plan. Its header records the decisions every phase relies on:
+  - URL layout A from the prototype: `/library/`, `/u/<username>/`, `/api/entries/`, `/api/users/<username>/entries/`
+  - the models and the owning apps
+  - the auth and 403/404 rules
+  - the shared save flow
+
+  The phases:
+  1. walking skeleton + accounts
+  2. RAWG search (plain form and HTMX)
+  3. add to library + minimal My Library
+  4. entry detail, edit, and delete
+  5. library browsing
+  6. sharing and privacy
+  7. API reads + tokens
+  8. API writes + shared library endpoint
+  9. demo seed, offline demo, and README
+
+  Committed the PRD, the plan, the sharing prototype, and the grill-me session log in `PROMPTS.md` as `b4bc4a1` on `main`. No app code has been written.
+- **Deviations:**
+  - The first breakdown had 13 phases. I asked for the three suggested merges, which made 10 phases:
+    - both search phases combined
+    - detail/edit combined with HTMX edit/delete
+    - API writes combined with the shared library endpoint
+  - Follow-up question: asked whether any more merges were worth doing. The recommendation was to fold accounts into the walking skeleton and keep the rest separate. I took it, which made 9 phases.
+  - Details the plan adds that the PRD doesn't specify:
+    - the add-to-library action is at `/games/add/`
+    - running `seed_demo` again must not create duplicates or crash
+    - regenerating an API token makes the old one stop working
+    - story 7 ("Sign in to add") moved to the add-to-library phase
+- **Sideways:**
+  - The prototype showed a 403 for API edits to another user's Public entry, but the PRD says 404. The plan follows the PRD and records the conflict in its header.
+  - "Grill-me" in the commit request was ambiguous. The agent read it as the interview session log in `PROMPTS.md` and said so before committing.
+  - Git warned about line-ending conversion when committing (harmless).
+  - The agent's first attempt to edit `PROMPTS.md` failed because the text it searched for had the wrong indentation. The second attempt worked.
+
 ## 2026-11-16 — Designed the Django RAWG game backlog tracker in a 22-question interview, prototyped the sharing URLs, and wrote the PRD
 
 ### Prompts
