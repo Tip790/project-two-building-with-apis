@@ -28,6 +28,51 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 8 (API writes + shared library endpoint) with three TDD behaviors
+
+### Prompts
+1. `/implement` @prd/game-backlog-tracker.md @plans/game-backlog-tracker.md Implement phase 8
+2. go ahead with those three
+3. the test is right, make it pass
+4. move to behavior 2
+5. the test is right, make it pass
+6. move to behavior 3
+7. make it green!
+8. finish phase 8
+9. verification passed, write the PROMPTS.md entry and commit
+
+### Summary
+- **Outcome:** Phase 8 of the plan is built:
+  - **Writes:** `EntryViewSet` in `library/api.py` is now a full `ModelViewSet`, still scoped to the requester's own entries. PUT, PATCH and DELETE on anyone else's entry are 404s, Public or Private. Delete removes only the entry; the shared game stays.
+  - **Create:** `EntrySerializer` takes a write-only `rawg_id` and uses the shared save flow (`get_or_fetch_game`, then `add_to_library`, which now accepts the entry's own fields). A RAWG failure for an unsaved game is a 503 (`RawgUnavailable`) with the friendly message, and nothing is saved. A duplicate is a 400 `{"rawg_id": ["Already in your library."]}`, including when it loses a race to another request. The wording is one `ALREADY_IN_LIBRARY` constant in `library/services.py`.
+  - **Validation:** the serializer keeps the model's own rating and hours validators instead of DRF's min/max checks, and calls the shared `validate_platform_for_game`, so its messages match the website form.
+  - **Platform field:** `PlatformField` is written as a platform's primary key and shown as the full platform. `rawg_id` is read-only on update, so an entry's game can't change.
+  - **RAWG 404s:** `games/rawg.py` has a `RawgNotFound` subclass of `RawgError`. The API reports a RAWG id that doesn't exist as a 400 on `rawg_id`, not a 503. The website still catches `RawgError`, so it is unchanged.
+  - **Shared library endpoint:** `/api/users/<username>/entries/` (`api:user-entries`) is a read-only list that uses the website's `_visible_library_owner_or_404`, with the same `EntryFilter`, 12 per page and RAWG attribution.
+
+  TDD covered three behaviors, each RED → approved → GREEN:
+  1. create uses the shared save flow: a 503 with the friendly message and nothing saved while RAWG is down, then a 201 with one RAWG call and the client's fields once it's back
+  2. bad ratings, hours and platforms get a 400 with exactly the website form's messages, on both create and update
+  3. the shared endpoint shows Public libraries to anyone and owners their own, gives a Private library and a missing username byte-identical 404s, and switching to Private on Settings hides it from the next request
+
+  All 250 tests pass, and Ruff lint and format are clean. The user confirmed manual browser verification passed.
+- **Deviations:** The user approved each TDD test unchanged, and no recommendations were overridden. When presenting tests, the agent pointed out two choices the user could change and the user kept both: `platform` is a primary key on create (so a brand-new game needs a follow-up PATCH to set it), and the shared endpoint is open to signed-out clients, like `/u/<username>/`. Decisions made during the phase that the PRD doesn't specify:
+  - A duplicate create is a 400 keyed by `rawg_id`, not a 409.
+  - A RAWG id RAWG doesn't have is a 400, not a 503, because RAWG itself is working.
+  - If RAWG succeeds but the entry's fields are invalid, the fetched `Game` stays stored. Games are one shared table, so this is harmless.
+  - The shared endpoint is a list only, with no detail URL, as in the plan.
+- **Sideways:**
+  - Behavior 1's RED was a `405 == 503`, because the endpoint was still read-only. Behaviors 2 and 3 got scaffolding first (a writable platform field and update; an unchecked shared list view) so they failed on the real assertions.
+  - Behavior 3's first run failed with a `KeyError`, because the test helper had no placeholder token for carol. That doesn't count as RED. A token was added and the re-run failed on `200 == 404`.
+  - The scaffold shared view first used `.get(username=...)`, which would have crashed on a missing username. It was changed to a filter before the test ran, so failures stayed assertions.
+  - Behaviors 1 and 2 each removed one line from the Phase 7 "read-only until Phase 8" test (POST, then PATCH as 405), noted as mechanical. The rest of that test was removed when delete was built.
+  - One Bash heredoc that appended the regular tests failed on a quoting error before it ran (the same as in Phases 6 and 7). Nothing was written, and the tests were written to a scratch file and appended from there.
+  - Ruff sorted one import block in `library/services.py`.
+  - Known gaps:
+    - A rating of −1 or a non-numeric value can still get different wording from the API and the website, because those fail earlier type checks.
+    - The browsable API's write forms are checked only for a 200 HTML response, not used in a real browser by any test.
+    - The README doesn't describe the API yet. That's planned for Phase 9.
+
 ## 2026-11-16 — Implemented Phase 7 (API reads + tokens) with three TDD behaviors
 
 ### Prompts

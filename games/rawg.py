@@ -24,6 +24,10 @@ class RawgError(Exception):
     """A RAWG request failed. The message is safe to show to the user."""
 
 
+class RawgNotFound(RawgError):
+    """RAWG answered, but has nothing at that address (a 404)."""
+
+
 def _get(path: str, params: dict | None = None, not_found: str = "") -> dict:
     """Send a GET request to RAWG and return the JSON body."""
     api_key = settings.RAWG_API_KEY
@@ -59,7 +63,7 @@ def _get(path: str, params: dict | None = None, not_found: str = "") -> dict:
             "RAWG_API_KEY in the .env file."
         )
     if status == 404:
-        raise RawgError(not_found or "RAWG could not find that.")
+        raise RawgNotFound(not_found or "RAWG could not find that.")
     if status == 429:
         raise RawgError("The site has reached RAWG's rate limit. Try again later.")
     if status >= 500:

@@ -17,6 +17,7 @@ from rest_framework.test import APIClient
 
 from games import rawg
 from games.models import Game, Genre, Platform
+from library.forms import EntryForm
 from library.models import LibraryEntry
 
 pytestmark = pytest.mark.django_db
@@ -24,6 +25,7 @@ pytestmark = pytest.mark.django_db
 PLACEHOLDER_TOKENS = {
     "alice": "placeholder-token-alice-000000000000000",
     "bob": "placeholder-token-bob-00000000000000000",
+    "carol": "placeholder-token-carol-000000000000000",
 }
 
 
@@ -301,17 +303,6 @@ def test_each_entry_nests_its_game_details_with_genres_and_platforms():
     }
 
 
-def test_the_api_is_read_only_until_phase_8():
-    alice = make_user("alice")
-    entry = LibraryEntry.objects.create(user=alice, game=make_game(1, "Hades"))
-    client = token_client(alice)
-
-    assert client.post(entries_url(), {"rawg_id": 2}).status_code == 405
-    assert client.patch(entries_url(entry.pk), {"rating": 5}).status_code == 405
-    assert client.delete(entries_url(entry.pk)).status_code == 405
-    assert LibraryEntry.objects.filter(pk=entry.pk, rating=None).exists()
-
-
 def test_api_reads_work_while_rawg_is_down(monkeypatch):
     def _no_rawg(*args, **kwargs):
         raise AssertionError("The API must not call RAWG to read entries")
@@ -464,3 +455,431 @@ def test_api_page_past_the_end_is_a_404():
     response = token_client(alice).get(entries_url(), {"page": 9})
 
     assert response.status_code == 404
+
+
+# --- Writes (Phase 8) -------------------------------------------------------
+
+
+def sample_rawg_detail(rawg_id=3328):
+    """A hand-written RAWG /games/<id> response, trimmed to the fields we use."""
+    return {
+        "id": rawg_id,
+        "slug": "the-witcher-3-wild-hunt",
+        "name": "The Witcher 3: Wild Hunt",
+        "released": "2015-05-18",
+        "background_image": "https://media.rawg.io/media/games/witcher3.jpg",
+        "metacritic": 92,
+        "description_raw": "An open-world RPG.",
+        "genres": [{"id": 5, "name": "RPG", "slug": "role-playing-games-rpg"}],
+        "platforms": [{"platform": {"id": 4, "name": "PC", "slug": "pc"}}],
+    }
+
+
+def test_api_create_uses_the_shared_save_flow(monkeypatch):
+    rawg_is_up = False
+    calls = []
+
+    def _fake_get_game(rawg_id):
+        calls.append(rawg_id)
+        if not rawg_is_up:
+            raise rawg.RawgError("RAWG is having problems right now. Try again later.")
+        return sample_rawg_detail(rawg_id)
+
+    monkeypatch.setattr(rawg, "get_game", _fake_get_game)
+    client = token_client(make_user("alice"))
+    payload = {
+        "rawg_id": 3328,
+        "status": "playing",
+        "rating": 4,
+        "hours_played": "12.5",
+        "notes": "Started in Velen.",
+    }
+
+    # RAWG is down and the game isn't stored: a 503 with the friendly
+    # message, and nothing is saved.
+    response = client.post(entries_url(), payload, format="json")
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "RAWG is having problems right now. Try again later."
+    }
+    assert not Game.objects.exists()
+    assert not LibraryEntry.objects.exists()
+
+    # Once RAWG is back, the same request fetches the game once and saves
+    # the entry with the client's own fields.
+    rawg_is_up = True
+    calls.clear()
+    response = client.post(entries_url(), payload, format="json")
+    assert response.status_code == 201
+    assert calls == [3328]
+    entry = LibraryEntry.objects.get()
+    assert entry.game.name == "The Witcher 3: Wild Hunt"
+    assert list(entry.game.platforms.values_list("name", flat=True)) == ["PC"]
+    assert (entry.status, entry.rating, entry.hours_played, entry.notes) == (
+        "playing",
+        4,
+        Decimal("12.5"),
+        "Started in Velen.",
+    )
+    data = response.json()
+    assert data["id"] == entry.pk
+    assert data["game"]["rawg_id"] == 3328
+    assert data["status"] == "playing"
+
+
+@pytest.mark.parametrize("action", ["create", "update"])
+@pytest.mark.parametrize(
+    "field, bad_value",
+    [
+        ("rating", 0),
+        ("rating", 6),
+        ("hours_played", "-1"),
+        ("hours_played", "10001"),
+        ("platform", "xbox"),
+    ],
+    ids=["rating-0", "rating-6", "hours-negative", "hours-over-cap", "platform"],
+)
+def test_api_rejects_bad_values_with_the_website_forms_messages(
+    action, field, bad_value
+):
+    alice = make_user("alice")
+    pc = Platform.objects.create(rawg_id=4, name="PC", slug="pc")
+    xbox = Platform.objects.create(rawg_id=1, name="Xbox One", slug="xbox-one")
+    hades, celeste = make_game(1, "Hades"), make_game(2, "Celeste")
+    hades.platforms.add(pc)
+    celeste.platforms.add(pc)
+    existing = LibraryEntry.objects.create(user=alice, game=hades)
+    if bad_value == "xbox":
+        bad_value = xbox.pk  # a real platform, but neither game is on it
+    client = token_client(alice)
+
+    # What the website's edit form says about this value.
+    target = existing if action == "update" else LibraryEntry(user=alice, game=celeste)
+    form = EntryForm({"status": "want_to_play", field: bad_value}, instance=target)
+    assert not form.is_valid()
+    website_messages = form.errors[field]
+
+    if action == "create":
+        payload = {"rawg_id": celeste.rawg_id, field: bad_value}
+        response = client.post(entries_url(), payload, format="json")
+    else:
+        payload = {field: bad_value}
+        response = client.patch(entries_url(existing.pk), payload, format="json")
+
+    assert response.status_code == 400
+    assert response.json() == {field: website_messages}
+    # Nothing was saved.
+    assert LibraryEntry.objects.count() == 1
+    existing.refresh_from_db()
+    assert (existing.rating, existing.hours_played, existing.platform) == (
+        None,
+        None,
+        None,
+    )
+
+
+# --- Shared library endpoint ------------------------------------------------
+
+
+def user_entries_url(username):
+    return reverse("api:user-entries", args=[username])
+
+
+def test_shared_library_endpoint_follows_the_websites_visibility_rule():
+    alice = make_user("alice")  # Private, the default
+    bob = make_user("bob", library_is_public=True)
+    carol = make_user("carol")
+    alices_ids = {
+        LibraryEntry.objects.create(user=alice, game=make_game(n, f"A{n}")).pk
+        for n in (1, 2)
+    }
+    bobs_ids = {LibraryEntry.objects.create(user=bob, game=make_game(3, "B3")).pk}
+    anonymous, as_carol = APIClient(), token_client(carol)
+
+    def ids(response):
+        return {entry["id"] for entry in response.json()["results"]}
+
+    # A Public library is visible to anyone, signed in or not.
+    for client in (anonymous, as_carol):
+        response = client.get(user_entries_url("bob"))
+        assert response.status_code == 200
+        assert ids(response) == bobs_ids
+
+    # Owners always see their own library, Private or not.
+    response = token_client(alice).get(user_entries_url("alice"))
+    assert response.status_code == 200
+    assert ids(response) == alices_ids
+
+    # To everyone else, a Private library and a username that doesn't exist
+    # get the very same 404.
+    for client in (anonymous, as_carol):
+        private = client.get(user_entries_url("alice"))
+        missing = client.get(user_entries_url("nobody"))
+        assert private.status_code == missing.status_code == 404
+        assert private.content == missing.content
+
+    # Switching to Private on Settings hides the library from the next request.
+    browser = session_client(bob)
+    assert browser.post(reverse("accounts:settings"), {}).status_code == 302
+    for client in (anonymous, as_carol):
+        response = client.get(user_entries_url("bob"))
+        assert response.status_code == 404
+        assert response.content == client.get(user_entries_url("nobody")).content
+
+
+# --- Writes: the rest -------------------------------------------------------
+
+
+def _rawg_must_not_be_called(*args, **kwargs):
+    raise AssertionError("RAWG must not be called for a stored game")
+
+
+def test_api_create_reuses_a_stored_game_without_calling_rawg(monkeypatch):
+    monkeypatch.setattr(rawg, "get_game", _rawg_must_not_be_called)
+    pc = Platform.objects.create(rawg_id=4, name="PC", slug="pc")
+    hades = make_game(1, "Hades")
+    hades.platforms.add(pc)
+    bob = make_user("bob")
+    LibraryEntry.objects.create(user=bob, game=hades)
+    client = token_client(make_user("alice"))
+
+    response = client.post(
+        entries_url(), {"rawg_id": 1, "platform": pc.pk}, format="json"
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["status"] == "want_to_play"  # the default
+    assert data["platform"] == {"id": pc.pk, "rawg_id": 4, "name": "PC", "slug": "pc"}
+    assert Game.objects.count() == 1
+    assert LibraryEntry.objects.filter(user__username="alice", game=hades).exists()
+
+
+def test_api_create_needs_a_rawg_id():
+    response = token_client(make_user("alice")).post(
+        entries_url(), {"status": "playing"}, format="json"
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"rawg_id": ["This field is required."]}
+    assert not LibraryEntry.objects.exists()
+
+
+def test_api_create_of_a_game_rawg_does_not_have_is_a_400(monkeypatch):
+    def _not_on_rawg(rawg_id):
+        raise rawg.RawgNotFound("That game was not found on RAWG.")
+
+    monkeypatch.setattr(rawg, "get_game", _not_on_rawg)
+
+    response = token_client(make_user("alice")).post(
+        entries_url(), {"rawg_id": 999999999}, format="json"
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"rawg_id": ["That game was not found on RAWG."]}
+    assert not Game.objects.exists()
+
+
+def test_api_duplicate_create_says_already_in_your_library(monkeypatch):
+    monkeypatch.setattr(rawg, "get_game", _rawg_must_not_be_called)
+    alice = make_user("alice")
+    entry = LibraryEntry.objects.create(
+        user=alice, game=make_game(1, "Hades"), rating=5
+    )
+
+    response = token_client(alice).post(
+        entries_url(), {"rawg_id": 1, "rating": 2}, format="json"
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"rawg_id": ["Already in your library."]}
+    assert LibraryEntry.objects.count() == 1
+    entry.refresh_from_db()
+    assert entry.rating == 5
+
+
+def test_api_duplicate_create_that_loses_a_race_is_still_a_400(monkeypatch):
+    # Another request adds the game between validation and the insert.
+    from library import serializers as entry_serializers
+    from library.services import AlreadyInLibrary
+
+    alice = make_user("alice")
+    hades = make_game(1, "Hades")
+
+    def _lose_the_race(user, rawg_id, **fields):
+        raise AlreadyInLibrary(LibraryEntry.objects.create(user=user, game=hades))
+
+    monkeypatch.setattr(entry_serializers, "add_to_library", _lose_the_race)
+
+    response = token_client(alice).post(entries_url(), {"rawg_id": 1}, format="json")
+
+    assert response.status_code == 400
+    assert response.json() == {"rawg_id": ["Already in your library."]}
+
+
+def test_api_full_and_partial_updates_save_the_owners_fields():
+    alice = make_user("alice")
+    pc = Platform.objects.create(rawg_id=4, name="PC", slug="pc")
+    hades = make_game(1, "Hades")
+    hades.platforms.add(pc)
+    entry = LibraryEntry.objects.create(user=alice, game=hades, notes="Old")
+    client = token_client(alice)
+
+    response = client.put(
+        entries_url(entry.pk),
+        {
+            "status": "completed",
+            "rating": 5,
+            "hours_played": "80",
+            "platform": pc.pk,
+            "notes": "Escaped!",
+        },
+        format="json",
+    )
+    assert response.status_code == 200
+    entry.refresh_from_db()
+    assert (entry.status, entry.rating, entry.hours_played, entry.platform) == (
+        "completed",
+        5,
+        Decimal("80"),
+        pc,
+    )
+    assert entry.notes == "Escaped!"
+
+    # PATCH changes only what it sends; null clears rating and platform.
+    response = client.patch(
+        entries_url(entry.pk), {"rating": None, "platform": None}, format="json"
+    )
+    assert response.status_code == 200
+    assert response.json()["platform"] is None
+    entry.refresh_from_db()
+    assert (entry.status, entry.rating, entry.platform, entry.notes) == (
+        "completed",
+        None,
+        None,
+        "Escaped!",
+    )
+
+
+def test_api_update_cannot_move_an_entry_to_another_game():
+    alice = make_user("alice")
+    entry = LibraryEntry.objects.create(user=alice, game=make_game(1, "Hades"))
+    make_game(2, "Celeste")
+
+    response = token_client(alice).patch(
+        entries_url(entry.pk), {"rawg_id": 2, "notes": "Hi"}, format="json"
+    )
+
+    assert response.status_code == 200
+    entry.refresh_from_db()
+    assert entry.game.name == "Hades"
+    assert entry.notes == "Hi"
+
+
+def test_api_delete_removes_only_the_entry():
+    alice = make_user("alice")
+    hades = make_game(1, "Hades")
+    entry = LibraryEntry.objects.create(user=alice, game=hades)
+    bobs = LibraryEntry.objects.create(user=make_user("bob"), game=hades)
+
+    response = token_client(alice).delete(entries_url(entry.pk))
+
+    assert response.status_code == 204
+    assert not LibraryEntry.objects.filter(pk=entry.pk).exists()
+    # The shared game and other users' entries stay.
+    assert Game.objects.filter(pk=hades.pk).exists()
+    assert LibraryEntry.objects.filter(pk=bobs.pk).exists()
+
+
+@pytest.mark.parametrize("bob_is_public", [True, False], ids=["public", "private"])
+@pytest.mark.parametrize("method", ["put", "patch", "delete"])
+def test_api_cannot_change_another_users_entry(two_libraries, method, bob_is_public):
+    bob = two_libraries["bob"]
+    bob.library_is_public = bob_is_public
+    bob.save()
+    bobs_entry = two_libraries["bob_entry"]
+    client = token_client(two_libraries["alice"])
+
+    response = getattr(client, method)(
+        entries_url(bobs_entry.pk), {"status": "dropped", "rating": 1}, format="json"
+    )
+
+    # Always a 404, never a 403, whatever Bob's sharing setting.
+    assert response.status_code == 404
+    bobs_entry.refresh_from_db()
+    assert (bobs_entry.status, bobs_entry.rating) == ("want_to_play", None)
+
+
+@pytest.mark.parametrize("method", ["post", "put", "patch", "delete"])
+def test_api_writes_need_credentials(two_libraries, method):
+    pk = None if method == "post" else two_libraries["alice_entries"][0].pk
+
+    response = getattr(APIClient(), method)(
+        entries_url(pk), {"rawg_id": 1, "status": "dropped"}, format="json"
+    )
+
+    assert response.status_code == 401
+    assert LibraryEntry.objects.count() == 3
+    assert not LibraryEntry.objects.filter(status="dropped").exists()
+
+
+def test_signed_in_users_can_open_an_entry_in_the_browsable_api(client):
+    alice = make_user("alice")
+    pc = Platform.objects.create(rawg_id=4, name="PC", slug="pc")
+    entry = LibraryEntry.objects.create(
+        user=alice, game=make_game(1, "Hades"), platform=pc
+    )
+    client.force_login(alice)
+
+    response = client.get(entries_url(entry.pk), headers={"accept": "text/html"})
+
+    assert response.status_code == 200
+    assert "Hades" in response.content.decode()
+
+
+# --- Shared library endpoint: browsing and read-only ------------------------
+
+
+def test_shared_library_endpoint_pages_filters_and_credits_rawg():
+    bob = make_user("bob", library_is_public=True)
+    for n in range(14):
+        LibraryEntry.objects.create(
+            user=bob,
+            game=make_game(n, f"Game {n:02}"),
+            status="completed" if n % 2 else "playing",
+        )
+    LibraryEntry.objects.create(user=make_user("alice"), game=make_game(99, "Other"))
+    client = APIClient()
+
+    first = client.get(user_entries_url("bob")).json()
+    assert first["count"] == 14
+    assert len(first["results"]) == 12
+    assert first["next"] is not None
+    assert first["attribution"] == {
+        "text": "Game data from RAWG.",
+        "name": "RAWG",
+        "url": "https://rawg.io",
+    }
+
+    completed = client.get(
+        user_entries_url("bob"), {"status": "completed", "sort": "name"}
+    ).json()
+    assert [entry["game"]["name"] for entry in completed["results"]] == [
+        f"Game {n:02}" for n in range(14) if n % 2
+    ]
+
+    bad = client.get(user_entries_url("bob"), {"status": "palying"})
+    assert bad.status_code == 400
+
+
+@pytest.mark.parametrize("method", ["post", "put", "patch", "delete"])
+def test_shared_library_endpoint_is_read_only_even_for_the_owner(method):
+    bob = make_user("bob", library_is_public=True)
+    LibraryEntry.objects.create(user=bob, game=make_game(1, "Hades"))
+
+    response = getattr(token_client(bob), method)(
+        user_entries_url("bob"), {"rawg_id": 1}, format="json"
+    )
+
+    assert response.status_code == 405
+    assert LibraryEntry.objects.count() == 1

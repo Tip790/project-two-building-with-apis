@@ -124,7 +124,7 @@ def test_http_errors_become_friendly_messages(monkeypatch, status, expected):
 def test_404_messages_fit_the_request(monkeypatch):
     fake_get(monkeypatch, FakeResponse(status_code=404))
 
-    with pytest.raises(RawgError, match="That game was not found on RAWG"):
+    with pytest.raises(rawg.RawgNotFound, match="That game was not found on RAWG"):
         rawg.get_game(999999999)
     with pytest.raises(RawgError, match="no more results"):
         rawg.search_games("hades", page=50)

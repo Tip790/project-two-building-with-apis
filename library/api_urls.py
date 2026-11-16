@@ -13,5 +13,10 @@ router.register("entries", api.EntryViewSet, basename="entry")
 
 urlpatterns = [
     path("token/", obtain_auth_token, name="token"),
+    path(
+        "users/<str:username>/entries/",
+        api.SharedLibraryEntries.as_view(),
+        name="user-entries",
+    ),
     path("", include(router.urls)),
 ]
