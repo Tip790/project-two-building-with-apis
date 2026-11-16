@@ -17,6 +17,15 @@
           <div class="card-body p-4">
             <h2 class="card-title text-base">{{ game.name }}</h2>
             <p class="text-sm opacity-70">{{ game.released|slice:":4"|default:"Release year unknown" }}</p>
+            {% if user.is_authenticated %}
+              {% if game.id in saved_ids %}
+                {% include "games/partials/add_button.html" with rawg_id=game.id state="in_library" %}
+              {% else %}
+                {% include "games/partials/add_button.html" with rawg_id=game.id state="" message="" next=request.get_full_path %}
+              {% endif %}
+            {% else %}
+              <a href="{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}" class="btn btn-outline btn-sm mt-2 self-start">Sign in to add</a>
+            {% endif %}
           </div>
         </li>
       {% endfor %}

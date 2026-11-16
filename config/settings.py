@@ -55,7 +55,7 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = "accounts.User"
 LOGIN_URL = "accounts:login"
-LOGIN_REDIRECT_URL = "games:home"
+LOGIN_REDIRECT_URL = "library:my_library"
 LOGOUT_REDIRECT_URL = "games:home"
 
 MIDDLEWARE = [

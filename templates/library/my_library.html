@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}My Library · Game Backlog Tracker{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-6">My Library</h1>
+
+{% if entries %}
+  <p class="mb-4 text-sm opacity-70">{{ entries|length }} game{{ entries|length|pluralize }} saved</p>
+  <ul class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for entry in entries %}
+      <li class="card bg-base-100 shadow-sm overflow-hidden" data-testid="library-entry">
+        <figure class="aspect-video bg-base-300">
+          <img src="{% if entry.game.background_image %}{{ entry.game.background_image }}{% else %}{% static 'img/cover-placeholder.svg' %}{% endif %}"
+               alt="Cover of {{ entry.game.name }}" loading="lazy" class="w-full h-full object-cover"
+               onerror="this.onerror=null;this.src='{% static 'img/cover-placeholder.svg' %}';">
+        </figure>
+        <div class="card-body p-4">
+          <h2 class="card-title text-base">{{ entry.game.name }}</h2>
+          <p class="text-sm opacity-70">{{ entry.game.released.year|default:"Release year unknown" }}</p>
+          <span class="badge badge-outline">{{ entry.get_status_display }}</span>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <div role="alert" class="alert">
+    <span>Your library is empty. <a href="{% url 'games:home' %}" class="link">Search for a game</a> and add it with one click.</span>
+  </div>
+{% endif %}
+{% endblock %}

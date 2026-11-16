@@ -15,8 +15,8 @@
     <ul class="menu menu-horizontal items-center gap-1">
       <li><a href="{% url 'games:home' %}">Search</a></li>
       {% if user.is_authenticated %}
-        {# My Library and Settings pages arrive in later phases; switch these to {% url %} then. #}
-        <li><a href="/library/">My Library</a></li>
+        {# The Settings page arrives in Phase 6; switch it to {% url %} then. #}
+        <li><a href="{% url 'library:my_library' %}">My Library</a></li>
         <li><a href="/settings/">Settings</a></li>
         <li>
           <form method="post" action="{% url 'accounts:logout' %}">
@@ -32,6 +32,13 @@
   </nav>
 
   <main class="flex-1 w-full max-w-5xl mx-auto px-4 py-8">
+    {% if messages %}
+      <div class="space-y-2 mb-6">
+        {% for message in messages %}
+          <div role="alert" class="alert {% if message.tags == 'error' %}alert-error{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %}"><span>{{ message }}</span></div>
+        {% endfor %}
+      </div>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
 

@@ -1,0 +1,25 @@
+{% comment %}
+The add-to-library control for one search result. Include with:
+  rawg_id - the game's RAWG id
+  state   - "in_library", "already", or empty for the Add button
+  message - an error to show above the Add button (optional)
+  next    - where a plain (non-HTMX) POST returns to
+{% endcomment %}
+<div class="add-slot mt-2" data-testid="add-slot">
+  {% if state == "in_library" %}
+    <span class="badge badge-success">In your library</span>
+  {% elif state == "already" %}
+    <span class="badge badge-info">Already in your library</span>
+  {% else %}
+    {% if message %}
+      <div role="alert" class="alert alert-error alert-soft mb-2 p-2 text-sm"><span>{{ message }}</span></div>
+    {% endif %}
+    <form method="post" action="{% url 'games:add' %}"
+          hx-post="{% url 'games:add' %}" hx-target="closest .add-slot" hx-swap="outerHTML">
+      {% csrf_token %}
+      <input type="hidden" name="rawg_id" value="{{ rawg_id }}">
+      <input type="hidden" name="next" value="{{ next }}">
+      <button type="submit" class="btn btn-primary btn-sm">{% if message %}Try again{% else %}Add to library{% endif %}</button>
+    </form>
+  {% endif %}
+</div>
