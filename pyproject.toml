@@ -1,0 +1,23 @@
+[project]
+name = "project-two-building-with-apis"
+version = "0.1.0"
+description = "CIDM 3312 Project #2: Building With APIs"
+requires-python = ">=3.14"
+dependencies = [
+    "python-dotenv>=1.2.4",
+    "requests>=2.34.2",
+    "truststore>=0.10.5",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.5",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["scripts"]
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
