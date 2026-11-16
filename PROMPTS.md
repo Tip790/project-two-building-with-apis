@@ -28,6 +28,50 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 3 (add to library + minimal My Library) with three TDD behaviors
+
+### Prompts
+1. `/implement` @prd/game-backlog-tracker.md @plans/game-backlog-tracker.md Implement phase 3
+2. continue with these three
+3. continue, make it green
+4. go ahead with behavior 2
+5. the test is right, make it pass
+6. continue to behavior 3
+7. the test is right, make it pass
+8. continue with the rest of phase 3
+9. the login redirect does not open /library/ on login
+10. it's neither, logging in in general does not redirect to the /library/ remaining at the home page
+11. manual verification passed, log it and commit
+
+### Summary
+- **Outcome:** Phase 3 of the plan is built:
+  - **Models:** `games.Genre`, `games.Platform` and `games.Game`, and `library.LibraryEntry`, in new migrations. Entries have a unique (user, game) constraint and check constraints for a 1–5 rating and 0–10,000 hours. All four models are registered in the admin.
+  - **Save flow:** `games/services.py` has `get_or_fetch_game(rawg_id)`. It reuses a stored game with no RAWG call. Otherwise it fetches RAWG's detail endpoint once and creates the game with its genres and platforms. `library/services.py` has `add_to_library(user, rawg_id)`, which raises `AlreadyInLibrary` for duplicates, including a race on the unique constraint.
+  - **Add button:** `/games/add/` is a sign-in-only POST. HTMX requests get the swapped control (`templates/games/partials/add_button.html`). A plain POST gets a flash message and a redirect to a same-site `next`. Search results show Add, "In your library" or "Sign in to add", and a RAWG failure shows "Couldn't add this game: …" with a Try again button and saves nothing.
+  - **My Library:** `/library/` lists the user's own entries from local data, newest first, with an empty state. The navbar links to it by URL name, and the base layout now shows flash messages.
+  - **Login:** logging in or signing up without a `next` now lands on My Library.
+  - **CSS:** `static/css/app.css` was rebuilt for the new classes.
+
+  TDD covered three behaviors, each RED → approved → GREEN:
+  1. a new RAWG id is fetched once and stored with its genres and platforms
+  2. adding a game someone else already saved works with RAWG down and makes no RAWG call
+  3. adding a game twice says "Already in your library" with no integrity error (HTMX and plain POST)
+
+  All 89 tests pass, and Ruff lint and format are clean. One live save of RAWG game 3328, rolled back afterwards, stored the name, date, Metacritic score, description, 2 genres and 7 platforms. The user confirmed manual browser verification passed.
+- **Deviations:** The user approved each TDD test unchanged. Follow-up: the user reported that logging in didn't open `/library/`. The agent first suspected a dropped `next` and asked two diagnostic questions. The user clarified they wanted every login to land on My Library, so `LOGIN_REDIRECT_URL` changed from the home page to `library:my_library`, which sign-up uses too. Decisions made during the phase that the PRD doesn't specify:
+  - The stored description is RAWG's plain-text `description_raw`, not its HTML, so no RAWG HTML reaches our pages.
+  - The save flow is `games.services.get_or_fetch_game`, and the add logic is `library.services.add_to_library` with an `AlreadyInLibrary` exception the API can reuse in Phase 8.
+  - A RAWG failure on add keeps the button as "Try again" under the error message.
+  - A plain-POST add only redirects to a same-site `next`, and falls back to the home page otherwise.
+- **Sideways:**
+  - The first behavior 1 run failed on an import error and then on `NotImplementedError`, neither of which counts as RED. A stub returning `None` gave an assertion failure.
+  - Before approval, the behavior 3 test's plain-POST case followed a redirect to `/?q=witcher`, which would have called RAWG for real. It was changed to `next=/`.
+  - The `/library/` login-redirect test posted straight to the login URL, so it couldn't have caught a form that dropped `next`. A probe of the real login form showed the hidden `next` field was there, which ruled that out.
+  - Piping a probe script into `manage.py shell` from PowerShell failed on a byte-order mark, and the Bash heredoc version didn't run its indented block. Running the script with `shell -c "exec(...)"` worked.
+  - Ruff's formatter rewrapped 3 files.
+  - The first `PROMPTS.md` edit failed (wrong indentation in the matched text), and the agent ran it in the same step as the commit and push. So the Phase 3 commit `8984cff` went to GitHub without this log, and the log was added in a follow-up commit.
+  - Known gaps: nothing tests the race-condition fallback in `add_to_library`. Two simultaneous first saves of the same new game could still hit the unique `rawg_id` in `get_or_fetch_game`. The "Sign up" link on the login page doesn't carry `next`.
+
 ## 2026-11-16 — Implemented Phase 2 (RAWG search, plain form and HTMX) with three TDD behaviors
 
 ### Prompts
