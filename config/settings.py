@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_filters",
+    "rest_framework",
+    "rest_framework.authtoken",
     "accounts",
     "games",
     "library",
@@ -58,6 +60,19 @@ AUTH_USER_MODEL = "accounts.User"
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "library:my_library"
 LOGOUT_REDIRECT_URL = "games:home"
+
+# Django REST Framework
+# Token first, so an unauthenticated request gets 401 with a WWW-Authenticate
+# header; the session lets signed-in users explore the browsable API.
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

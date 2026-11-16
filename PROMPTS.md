@@ -28,6 +28,51 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 7 (API reads + tokens) with three TDD behaviors
+
+### Prompts
+1. `/implement` @prd/game-backlog-tracker.md @plans/game-backlog-tracker.md Implement phase 7
+2. go ahead with the tests
+3. the test is right, make it pass
+4. move to behavior 2
+5. make it green
+6. move to behavior 3
+7. make it green!
+8. finish phase 7
+9. verification passed, write the PROMPTS.md entry and commit
+
+### Summary
+- **Outcome:** Phase 7 of the plan is built:
+  - **DRF setup:** `djangorestframework` 3.18.3 was added, with `rest_framework` and `rest_framework.authtoken` registered. Token authentication comes before session authentication, and `IsAuthenticated` is the default permission. The token table migrations were applied to the local database.
+  - **API URLs:** `library/api_urls.py` (namespace `api`) is included at `/api/`. It has `/api/token/` (DRF's `obtain_auth_token`) and a router for `/api/entries/` and `/api/entries/<pk>/`.
+  - **Entries viewset:** `library/api.py` has `EntryViewSet`, a read-only viewset whose queryset is the requester's own entries. It filters through the website's `EntryFilter` with `DjangoFilterBackend`, so parameter names and results match My Library.
+  - **Serializers:** `library/serializers.py` nests the game read-only in each entry: name, slug, cover URL, release date, Metacritic score, description, genres and platforms. It also includes the entry's own platform.
+  - **Pagination:** `library/pagination.py` has `EntryPagination`, 12 per page (`ENTRIES_PER_PAGE`), which adds `attribution: {"text": "Game data from RAWG.", "name": "RAWG", "url": "https://rawg.io"}` to every list response.
+  - **Settings:** a new "API access" card shows the user's token (created on the first visit), links to `/api/entries/`, and has a "Regenerate token" button. The button posts to `/settings/token/` (`accounts:regenerate_token`, sign-in and POST only), which deletes the old token and creates a new one in one transaction.
+  - **CSS:** `static/css/app.css` was rebuilt.
+
+  TDD covered three behaviors, each RED → approved → GREEN:
+  1. token and session clients see only their own entries, another user's entry is a 404 even in a Public library, and a request without credentials gets a 401 with no entry data
+  2. regenerating the token on Settings makes the old token get 401 on the very next request, while the new one works
+  3. list responses hold 12 entries per page with correct `count`/`next`/`previous`, and every page includes the RAWG attribution
+
+  All 215 tests pass, and Ruff lint and format are clean. The user confirmed manual browser verification passed.
+- **Deviations:** The user approved each TDD test unchanged, and no recommendations were overridden. Decisions made during the phase that the PRD doesn't specify:
+  - A request with no credentials gets 401 (not 403), because token auth is listed first and sends a `WWW-Authenticate: Token` header.
+  - An invalid filter or sort value in the API (for example `status=palying`) gets a 400 that names the parameter, unlike the website, which ignores it. A page past the end is a 404, which is DRF's default.
+  - The attribution is an object with `text`, `name` and `url`, and its text matches the website footer.
+  - Every user's token is created the first time they open Settings. Regenerating it deletes the row, so the old token stops working at once.
+  - Create, update and delete on `/api/entries/` return 405 until Phase 8, and a test checks this.
+- **Sideways:**
+  - The 12-per-page paginator was added as scaffolding for behavior 1, so that its test could read `results`. So behavior 3's paging assertions passed before its code, and only the attribution was RED. The agent said so before showing behavior 3.
+  - The first behavior 3 run failed with a `KeyError`, which doesn't count as RED. Before approval, the check was changed to `page.get("attribution")` so the missing field failed on an assertion.
+  - Behavior 1's first draft of the 401 check asserted `"id"` wasn't in the response, but DRF's message "…not provided." contains "id". It was changed, before running, to check that only `detail` comes back.
+  - One Bash heredoc that appended the regular tests failed on a quoting error before it ran (the same as in Phase 6). Nothing was written, and the tests were added with the Edit tool.
+  - This time the `PROMPTS.md` edit was made and checked before the commit, not in the same step.
+  - Known gaps:
+    - The browsable API is checked only for a 200 HTML response showing an entry. Its filter form isn't exercised in a real browser by any test.
+    - The README doesn't describe the API yet. That's planned for Phase 9.
+
 ## 2026-11-16 — Implemented Phase 6 (sharing and privacy) with three TDD behaviors
 
 ### Prompts

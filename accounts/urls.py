@@ -22,4 +22,5 @@ urlpatterns = [
         name="password_change_done",
     ),
     path("settings/", views.settings_page, name="settings"),
+    path("settings/token/", views.regenerate_token, name="regenerate_token"),
 ]

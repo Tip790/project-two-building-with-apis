@@ -34,4 +34,25 @@
     </div>
   </div>
 </section>
+
+<section class="card bg-base-100 shadow-sm max-w-2xl mt-6" aria-labelledby="api-heading">
+  <div class="card-body">
+    <h2 id="api-heading" class="card-title">API access</h2>
+    <p class="text-sm">
+      Your scripts can read your library from
+      <a href="{{ api_entries_url }}" class="link">{{ api_entries_url }}</a>
+      by sending this token in an <code>Authorization: Token &lt;your token&gt;</code> header.
+      Keep it secret: anyone with it can read your library as you.
+    </p>
+    <div>
+      <label for="api-token" class="font-medium text-sm">Your API token</label>
+      <input id="api-token" type="text" readonly value="{{ api_token }}" class="input input-bordered w-full mt-1 font-mono" onfocus="this.select()" data-testid="api-token">
+    </div>
+    <form method="post" action="{% url 'accounts:regenerate_token' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn">Regenerate token</button>
+      <p class="text-xs opacity-70 mt-2">Regenerating replaces this token. The old one stops working at once.</p>
+    </form>
+  </div>
+</section>
 {% endblock %}
