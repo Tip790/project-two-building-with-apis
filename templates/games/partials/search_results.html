@@ -1,0 +1,44 @@
+{% load static %}
+{% if error %}
+  <div role="alert" class="alert alert-error">
+    <span>{{ error }}</span>
+  </div>
+{% elif search %}
+  {% if search.results %}
+    <p class="mb-4 text-sm opacity-70">{{ search.count }} result{{ search.count|pluralize }} for “{{ query }}”</p>
+    <ul class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {% for game in search.results %}
+        <li class="card bg-base-100 shadow-sm overflow-hidden" data-testid="search-result">
+          <figure class="aspect-video bg-base-300">
+            <img src="{% if game.background_image %}{{ game.background_image }}{% else %}{% static 'img/cover-placeholder.svg' %}{% endif %}"
+                 alt="Cover of {{ game.name }}" loading="lazy" class="w-full h-full object-cover"
+                 onerror="this.onerror=null;this.src='{% static 'img/cover-placeholder.svg' %}';">
+          </figure>
+          <div class="card-body p-4">
+            <h2 class="card-title text-base">{{ game.name }}</h2>
+            <p class="text-sm opacity-70">{{ game.released|slice:":4"|default:"Release year unknown" }}</p>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+
+    {% if search.has_previous or search.has_next %}
+      <nav class="join flex justify-center mt-6" aria-label="Search result pages">
+        {% if search.has_previous %}
+          <a class="join-item btn" href="?q={{ query|urlencode }}&amp;page={{ search.page|add:'-1' }}"
+             hx-get="?q={{ query|urlencode }}&amp;page={{ search.page|add:'-1' }}" hx-target="#search-results" hx-push-url="true">« Previous</a>
+        {% endif %}
+        <span class="join-item btn btn-disabled">Page {{ search.page }}</span>
+        {% if search.has_next %}
+          <a class="join-item btn" href="?q={{ query|urlencode }}&amp;page={{ search.page|add:'1' }}"
+             hx-get="?q={{ query|urlencode }}&amp;page={{ search.page|add:'1' }}" hx-target="#search-results" hx-push-url="true">Next »</a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  {% else %}
+    <div role="alert" class="alert">
+      <span>No games found for “{{ query }}”. Try a different spelling or fewer words.</span>
+    </div>
+  {% endif %}
+  <p class="mt-6 text-center text-xs opacity-70">Search results from <a href="https://rawg.io" class="link" target="_blank" rel="noopener">RAWG</a>.</p>
+{% endif %}

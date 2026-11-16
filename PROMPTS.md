@@ -28,6 +28,46 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 2 (RAWG search, plain form and HTMX) with three TDD behaviors
+
+### Prompts
+1. `/implement` @prd/game-backlog-tracker.md @plans/game-backlog-tracker.md Implement phase 2
+2. go ahead with those three
+3. the test is right, make it pass
+4. go ahead with behavior 2
+5. the test is right, make it pass
+6. continue to behavior 3
+7. the test is right, make it pass
+8. continue with the rest of phase 2
+9. manual verification passed, log it and commit
+
+### Summary
+- **Outcome:** Phase 2 of the plan is built:
+  - **RAWG client:** `games/rawg.py`, moved from the archived console script. It reads `RAWG_API_KEY` from Django settings, keeps the `RawgError` friendly messages, and exposes `search_games(query, page)` and `get_game(rawg_id)`. A missing key raises "RAWG isn't configured" without any HTTP call.
+  - **Search page:** the home view searches RAWG and shows cards with the cover, name and release year, plus Previous/Next paging and a "Search results from RAWG" credit. The form and paging links work as plain GETs and through HTMX. HTMX requests get only the results partial (`templates/games/partials/search_results.html`), and history restores get the full page. Responses send `Vary: HX-Request`.
+  - **Errors:** any `RawgError` renders as an alert where the results go, with status 200. Empty searches show a "No games found" message.
+  - **Covers:** a missing or broken cover falls back to `static/img/cover-placeholder.svg`.
+  - **CSS:** `static/css/app.css` was rebuilt for the new classes.
+
+  TDD covered three behaviors, each RED → approved → GREEN:
+  1. a missing RAWG key says "RAWG isn't configured" and makes no HTTP call
+  2. HTMX searches return only the results fragment, and normal requests return the full page
+  3. a RAWG failure shows an alert in the results area, never an error page
+
+  All 52 tests pass, and Ruff lint and format are clean. One live search ("hollow knight") through the new client returned 12 results with names, years and covers. The user confirmed manual browser verification passed.
+- **Deviations:** No recommendations were overridden, and the user approved each TDD test unchanged. Decisions made during the phase that the PRD doesn't specify:
+  - Search shows 12 results per page so the 3-column grid fills evenly. The old console script showed 10.
+  - A 404 gives a message that fits what was asked for: "That game was not found on RAWG" for a game, "There are no more results" for a search page past the end.
+  - Key and rate-limit messages now speak to a website visitor ("the site's API key", "the site operator needs to check…"), not a console user.
+  - HTMX history-restore requests get the full page, and responses send `Vary: HX-Request`, so Back and caching can't show a bare fragment.
+  - The behavior 3 test uses a client that doesn't re-raise server exceptions, so a crash shows up as the 500 a browser would get.
+- **Sideways:**
+  - Two of the first view tests failed because of how they were written, not the code. Django escapes the apostrophe in "isn't", so the test now unescapes the HTML. The paging links used a bare `&` in attributes, so the template now writes `&amp;`.
+  - A test edit through `python` in the shell failed because this machine has no bare `python` command. The edit was redone with the Edit tool.
+  - Ruff's formatter rewrapped one line in `games/rawg.py`.
+  - A grep check reported the `lg:grid-cols-3` class missing from the compiled CSS. The rule was there; the grep pattern was wrong.
+  - Known gaps: nothing tests the `onerror` fallback in a real browser (only its markup is checked), and "Sign in to add" and the Add button arrive in Phase 3.
+
 ## 2026-11-16 — Implemented Phase 1 (walking skeleton + accounts) with three TDD behaviors
 
 ### Prompts
