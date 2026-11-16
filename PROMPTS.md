@@ -28,6 +28,52 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 6 (sharing and privacy) with three TDD behaviors
+
+### Prompts
+1. `/implement` @prd/game-backlog-tracker.md @plans/game-backlog-tracker.md Implement phase 6
+2. go ahead with those three
+3. the test is right, make it pass
+4. move to behavior 2
+5. the test is right, make it pass
+6. move on to the new behavior
+7. make it pass
+8. finish phase 6
+9. verification passes, write entry and commit
+
+### Summary
+- **Outcome:** Phase 6 of the plan is built:
+  - **Settings:** `/settings/` (`accounts:settings`, sign-in only) shows whether the library is Public or Private, has a `SharingForm` toggle that flashes "Your library is now Public." or "…Private.", and shows a copyable share link. The navbar links to it by URL name.
+  - **Shared library:** `/u/<username>/` (`shared:library`, in `library/shared_urls.py`) uses the same browsing as My Library through a new `_browse` helper: search, filters, sort, 12 per page and HTMX swaps. The filter bar moved to `templates/library/partials/filter_bar.html` so both pages share it.
+  - **Read-only detail:** `/u/<username>/<pk>/` (`shared:entry_detail`) reuses `entry_detail.html` with `read_only`. It shows the owner's status, rating, hours, platform and notes, with no form or delete button.
+  - **Visibility rule:** `_visible_library_owner_or_404` raises the same bare `Http404` for a missing username and for a Private library viewed by anyone but its owner.
+  - **Edit refusals:** `_own_entry_or_404` now gives non-owners a 403 for a Public entry and a 404 for a Private one. `@login_required` still sends signed-out visitors to log in.
+  - **Owner preview:** owners viewing their own shared pages see "This is how others see your library" and an "Edit in My Library" link.
+  - **CSS:** `static/css/app.css` was rebuilt for the toggle and input classes.
+
+  TDD covered three behaviors, each RED → approved → GREEN:
+  1. a Private library and a username that doesn't exist get byte-identical 404s on both shared pages, Public libraries are visible to anyone, and owners see their own
+  2. switching to Private on Settings makes a working share link 404 on the next request
+  3. non-owner edit, save, delete-confirm and delete attempts are 403 (Public), 404 (Private) or a login redirect (signed out), and leave the entry unchanged
+
+  All 180 tests pass, and Ruff lint and format are clean. The user confirmed manual browser verification passed.
+- **Deviations:** The user approved each TDD test unchanged, and no recommendations were overridden. When showing the behavior 3 test, the agent pointed out it treats opening `/library/<pk>/` as an edit attempt (403 for a stranger on a Public entry, not a redirect to the read-only page). The user kept it. Decisions made during the phase that the PRD doesn't specify:
+  - To put Settings at `/settings/` in the `accounts` namespace, `accounts.urls` is now included at the root with full `accounts/...` paths. Every existing URL is unchanged.
+  - Shared pages are read-only for everyone, owners included. Owners edit through My Library.
+  - An entry addressed under the wrong username (`/u/alice/<bob's pk>/`) is a 404.
+  - The Settings form edits only `library_is_public` on the signed-in user. A test checks that extra fields such as `username` and `is_staff` are ignored.
+- **Sideways:**
+  - Behavior 1's shared views were built at first with no visibility check, so the test failed on `200 == 404`. Behavior 2's Settings view didn't handle POST at first, so it failed on `200 == 302`.
+  - In behavior 3, only the 4 Public cases were RED (`404 == 403`). The other 12 already passed from Phases 3 and 4 and were kept as regression checks, which the agent said when presenting the test.
+  - One Bash heredoc that appended the regular tests was rejected for a quoting error before it ran. Nothing was written, and the tests were added with the Edit tool.
+  - The `names_on_page` test helper first counted each game twice, because each cover's alt text repeats the name. It was fixed to match only the card links, without changing what the tests check.
+  - Ruff's formatter rewrapped 2 files. Every edited file was checked for valid UTF-8, and the en dash, «, … and ★ were intact.
+  - The first `PROMPTS.md` edit failed (wrong indentation in the matched text), and the agent ran it in the same step as the commit and push — the same mistake as in Phase 3. So the Phase 6 commit `ab639e4` went to GitHub without this log, and the log was added in a follow-up commit.
+  - Known gaps:
+    - With DEBUG on, Django's debug 404 pages differ by path. The identical-404 guarantee is tested with DEBUG off.
+    - Nothing exercises the Settings toggle or the shared filter bar's HTMX in a real browser (only markup and responses are checked).
+    - The API token section of Settings waits for Phase 7.
+
 ## 2026-11-16 — Implemented Phase 5 (library browsing) with three TDD behaviors
 
 ### Prompts
