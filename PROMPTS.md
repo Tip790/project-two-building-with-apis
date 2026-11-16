@@ -28,6 +28,47 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 9 (demo seed, offline demo, README) with three TDD behaviors
+
+### Prompts
+1. `/implement` @prd/game-backlog-tracker.md @plans/game-backlog-tracker.md Implement phase 9
+2. continue with these 3
+3. make it green
+4. add the missing tests
+5. the test is right, make it pass as written keep the added by hand entries
+6. move to behavior 3
+7. make it green!
+8. finish phase 9
+9. verification passed, write the PROMPTS.md entry and commit
+
+### Summary
+- **Outcome:** Phase 9 of the plan is built:
+  - **Seed command:** `library/management/commands/seed_demo.py` creates `demo_public` (Public, 6 games) and `demo_private` (Private, 4 games) with the password `demo-password-local-only`, marked local-demo-only. Its `DEMO_LIBRARIES` table has 8 RAWG ids, and The Witcher 3 and Hollow Knight are in both libraries. Each game goes through the real save flow (`add_to_library`, which calls `get_or_fetch_game`), and the entries vary in status, rating, hours, platform and notes. The command prints a line per user and a success line.
+  - **Re-runs:** running it again resets the demo. Both users' visibility, their password and their seeded entries go back to the table's values, and entries added by hand are kept. A re-run creates no duplicates and makes no RAWG calls.
+  - **RAWG failures:** a failure becomes a `CommandError` with RAWG's friendly message plus "Run seed_demo again once RAWG is reachable." Progress so far is kept, and the next run fetches only the missing games.
+  - **README:** a settings table, demo data, offline-demo steps (turn off the network or blank `RAWG_API_KEY`), and an API section with `YOUR_TOKEN` placeholders covering the token, the endpoints, fields, filters, pagination and error codes.
+
+  TDD covered three behaviors, each RED → approved → GREEN:
+  1. the first run creates a Private and a Public demo user with varied entries, fetches each RAWG id exactly once, and has a game in both libraries
+  2. a re-run creates no duplicates, makes no RAWG calls, and restores the demo users' visibility, password and seeded entries
+  3. a RAWG failure stops with a `CommandError` carrying the friendly message, and a re-run fetches only the missing games and finishes
+
+  Regular tests cover hand-added entries surviving a re-run, a first run with RAWG down saving nothing, and the seeded shared, My Library and detail pages plus `/api/entries/` working while RAWG is blocked. A one-time live check (8 read-only RAWG requests, nothing saved) confirmed every id is the intended game and every seeded platform slug is on its game. All 256 tests pass, and Ruff lint and format are clean. The user confirmed manual browser verification passed.
+- **Deviations:** The user approved each TDD test unchanged. When approving behavior 2, the user added "keep the added by hand entries". The code already did this. Because the approved test couldn't change without re-approval, the check went into a separate regular test. Prompt 4 ("add the missing tests") was ambiguous after behavior 1. The agent read it as going on to behaviors 2 and 3, one at a time, and said so. When presenting tests, the agent pointed out choices the user could change, and the user kept them all:
+  - the usernames, the password, and a game shared by both users (behavior 1)
+  - a re-run resets the demo rather than leaving it alone (behavior 2)
+  - a failed run keeps partial progress instead of rolling back (behavior 3)
+- **Sideways:**
+  - Behavior 1 got an empty command as scaffolding, so its test failed on `None is not None`.
+  - Behavior 2's first run crashed with an `IntegrityError` on the duplicate username, which doesn't count as RED. Scaffolding (reuse existing users, skip games already in the library) made it fail on the restore assertion. The agent said that the no-duplicate and no-RAWG-call parts already passed because of this.
+  - Behavior 3's resume half already worked from behavior 2, and only the `CommandError` assertion was RED. The agent said so before approval. Before approval, the test's imports were also moved to the top of the file, which changed nothing it checks.
+  - The first draft of the offline test picked the newest Public entry, Skyrim, whose notes are empty. An empty string is always "in" the page, so the check would have passed trivially. It was changed to pick an entry with notes and to unescape the HTML (notes contain apostrophes). It now also blocks `requests.get`.
+  - Ruff's formatter rewrapped the `DEMO_LIBRARIES` table and the test file.
+  - Known gaps:
+    - Re-running resets a demo password someone changed during a demo, which the README says.
+    - The README's `curl` examples were not run by any test. Their endpoints and fields were checked against the code.
+    - The offline demo was checked by the user in the browser, and by tests that block RAWG, not by a test with the network actually off.
+
 ## 2026-11-16 — Implemented Phase 8 (API writes + shared library endpoint) with three TDD behaviors
 
 ### Prompts
