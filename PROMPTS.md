@@ -28,6 +28,37 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Explained the API endpoints and wrote a Python client script for them
+
+This continues the Phase 9 session. Its first 9 prompts are in the entry below.
+
+### Prompts
+1. Show me the API endpoints in my project in table format. Choose a list endpoint and a related detail endpoint for me to open in the browser. Explain any authentication needed and give me the URLs for viewing JSON.
+2. Walk me through the api/entries/ endpoint. Show me the associated model, serializer, and view
+3. Create a Python script in the scripts/ directory that consumes my projects API. The script should have two behaviors: 1. Call one list endpoint with query parameters and print the results. 2. Call one update endpoint that updates one field through the API. Print the before and after results.
+4. add to PROMPTS.md then commit and push
+
+### Summary
+- **Outcome:**
+  - **Endpoints table:** the agent listed the five API endpoints and chose `/api/entries/` with `/api/entries/<id>/` for the browser. It explained that a website login (session) or `Authorization: Token …` is needed and that signed-out requests get a 401. It gave `?format=json` URLs, plus the Public `/api/users/demo_public/entries/` list that needs no login.
+  - **Walkthrough of `/api/entries/`:**
+    - routing: the `DefaultRouter`'s URLs and actions
+    - the `LibraryEntry` model and its three layers of validation
+    - `EntryViewSet`, where `get_queryset` scoped to the requester is the privacy rule, plus the shared `EntryFilter` and `EntryPagination`
+    - `EntrySerializer`: write-only `rawg_id`, the nested read-only `game`, `PlatformField`, the kept model validators, and `validate()`/`create()` going through the shared save flow, with the errors each returns
+  - **Client script:** `scripts/backlog_api.py` (uses `requests`) has two subcommands:
+    - `list` sends `GET /api/entries/` with `--q`, `--status`, `--min-rating`, `--sort` and `--page`, and prints the count, each entry and the RAWG attribution.
+    - `update <id> <field> <value>` reads the entry, sends a `PATCH` with only that field, and prints it before and after. `null` clears a field.
+
+    The token comes from `--token`, from `BACKLOG_API_TOKEN` (`.env` is read only when the script runs for real, never by the tests), or from `--username` with a password prompt. API errors print one `Error:` line with the API's own message, and the script exits with code 1. `.env.example` documents `BACKLOG_API_TOKEN` (commented out), and the README has an "Example client script" section.
+  - **Tests:** `tests/test_backlog_api_script.py` has 8 tests that run the script against pytest-django's `live_server`, so they use the real API. They check list filters and sort, a one-field update that leaves the others alone, setting a platform and clearing a field, a rejected rating with nothing changed, another user's entry as a 404, and the bad-token, no-token and server-down messages. All 264 tests pass, and Ruff is clean.
+- **Deviations:** None. No recommendations were made or overridden, and no follow-up questions were asked. The agent chose PATCH, so only the one field changes, and chose to add tests and docs, which the request didn't ask for.
+- **Sideways:**
+  - The first draft called `load_dotenv()` inside `main()`, so the tests would have read the real `.env`, against the project rule. It was moved to the `__main__` block before any test ran.
+  - The first draft showed a missing release date as "unkn". It was fixed before testing.
+  - The first test run took 25 seconds. `live_server.url` uses `localhost`, which on Windows tries IPv6 first and waits about 2 seconds per request. The tests now use `127.0.0.1` (the script's default), and the full suite went back to about 6 seconds.
+  - Known gap: the script was tested only against `live_server`, not against the user's own `runserver` with a real token.
+
 ## 2026-11-16 — Implemented Phase 9 (demo seed, offline demo, README) with three TDD behaviors
 
 ### Prompts

@@ -116,6 +116,22 @@ Lists hold 12 entries per page, with `count`, `next`, `previous`, `results` and 
 - 400: invalid fields, with the same messages as the website. A game already in your library gets `{"rawg_id": ["Already in your library."]}`.
 - 503: RAWG is unavailable while creating an entry for a game that isn't stored yet. Nothing is saved.
 
+### Example client script
+
+`scripts/backlog_api.py` calls the API from Python. Start `runserver` first. The script needs your token, which it can get in three ways:
+- `BACKLOG_API_TOKEN` in `.env` or your environment
+- `--token YOUR_TOKEN`
+- `--username demo_public`, which prompts for the password
+
+```sh
+# List entries with query parameters (--q, --status, --min-rating, --sort, --page)
+uv run python scripts/backlog_api.py list --status playing --sort rating
+
+# Change one field of one entry (status, rating, hours_played, platform or notes) and print it before and after
+uv run python scripts/backlog_api.py update 3 rating 4
+uv run python scripts/backlog_api.py update 3 rating null    # clear it
+```
+
 ## Styles (Tailwind CSS + DaisyUI)
 
 The compiled stylesheet, `static/css/app.css`, is committed, so you only need these steps when you change templates or styles. The build uses the Tailwind **standalone CLI**, so Node.js isn't needed.
