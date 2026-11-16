@@ -1,0 +1,42 @@
+{% load static %}<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Game Backlog Tracker{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="{% static 'js/htmx.min.js' %}" defer></script>
+</head>
+<body class="min-h-screen flex flex-col bg-base-200 text-base-content">
+  <nav class="navbar bg-base-100 shadow-sm px-4">
+    <div class="flex-1">
+      <a href="{% url 'games:home' %}" class="text-lg font-bold">Game Backlog Tracker</a>
+    </div>
+    <ul class="menu menu-horizontal items-center gap-1">
+      <li><a href="{% url 'games:home' %}">Search</a></li>
+      {% if user.is_authenticated %}
+        {# My Library and Settings pages arrive in later phases; switch these to {% url %} then. #}
+        <li><a href="/library/">My Library</a></li>
+        <li><a href="/settings/">Settings</a></li>
+        <li>
+          <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit">Log out ({{ user.username }})</button>
+          </form>
+        </li>
+      {% else %}
+        <li><a href="{% url 'accounts:login' %}">Log in</a></li>
+        <li><a href="{% url 'accounts:signup' %}" class="btn btn-primary btn-sm">Sign up</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+
+  <main class="flex-1 w-full max-w-5xl mx-auto px-4 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer footer-center bg-base-100 text-base-content p-4">
+    <p>Game data from <a href="https://rawg.io" class="link" target="_blank" rel="noopener">RAWG</a>.</p>
+  </footer>
+</body>
+</html>

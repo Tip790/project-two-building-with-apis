@@ -1,0 +1,33 @@
+/* Source for static/css/app.css. Rebuild with the Tailwind CLI (see README). */
+@import "tailwindcss" source(none);
+@source "../templates";
+
+@plugin "./daisyui.mjs" {
+  themes: light --default, dark --prefersdark;
+}
+
+/* Django renders form fields without CSS classes, so style them here. */
+@layer components {
+  .form-stack {
+    @apply flex flex-col gap-4;
+  }
+  .form-stack > div {
+    @apply flex flex-col gap-1;
+  }
+  .form-stack label {
+    @apply font-medium;
+  }
+  .form-stack input:not([type="hidden"]):not([type="checkbox"]) {
+    @apply input w-full;
+  }
+  .form-stack .helptext,
+  .form-stack .helptext ul {
+    @apply text-sm opacity-70;
+  }
+  .form-stack .helptext ul {
+    @apply list-disc pl-5;
+  }
+  .form-stack .errorlist {
+    @apply text-sm text-error;
+  }
+}

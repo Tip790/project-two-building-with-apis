@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="text-center space-y-6 py-12">
+  <h1 class="text-4xl font-bold">Find a game. Track your backlog.</h1>
+  <p class="text-lg opacity-80">Search the RAWG game database and keep track of what you're playing, what you've finished, and what's next.</p>
+  <form action="{% url 'games:home' %}" method="get" role="search" class="join w-full max-w-xl mx-auto">
+    <label for="search-q" class="sr-only">Game title</label>
+    <input id="search-q" type="search" name="q" value="{{ query }}" placeholder="Search for a game title" class="input input-bordered join-item w-full">
+    <button type="submit" class="btn btn-primary join-item">Search</button>
+  </form>
+</section>
+{% endblock %}

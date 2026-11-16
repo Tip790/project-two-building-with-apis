@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Tailwind standalone CLI executable (download it; see README)
+tailwind/tailwindcss
+tailwind/tailwindcss.exe

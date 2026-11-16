@@ -28,6 +28,77 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 1 (walking skeleton + accounts) with three TDD behaviors
+
+### Prompts
+1. `/implement` @prd/game-backlog-tracker.md @plans/game-backlog-tracker.md Implement phase 1
+2. go ahead with those three
+3. the test is right, make it pass
+4. go ahead with behavior 2
+5. the test is right, make it pass
+6. continue to behavior 3
+7. continue with making it green
+8. continue with the rest of phase 1
+9. manual verification passed, log it and commit
+
+### Summary
+- **Outcome:** Phase 1 of the plan is built:
+  - **Project setup:** a Django 6.1.3 project (`config`) with the `accounts`, `games` and `library` apps. Django is pinned to `~=6.1.3`, and pytest-django was added.
+  - **Users:** a custom `accounts.User` with `library_is_public` (default False), created in the first migration and registered in the admin with that field.
+  - **Settings:** read from `.env`. A missing `DJANGO_SECRET_KEY` stops the app, `DJANGO_DEBUG` defaults to off, and `RAWG_API_KEY` is optional. `.env.example` documents all three.
+  - **Accounts:** sign-up plus Django's built-in login, logout and password-change pages, all under the `accounts` namespace.
+  - **Layout:** a base layout with a navbar that changes when you sign in, and a RAWG footer credit. The home page has the tagline and a search box that does a plain GET for now.
+  - **Front end:** Tailwind CLI v4.3.3 (git-ignored) with the DaisyUI 5.7.50 plugin file, the compiled `static/css/app.css`, and HTMX 2.0.11 as a local file.
+  - **Archive:** the console script and its tests moved to `archive/initial-api-verification/` with a README. The folder is excluded from pytest and Ruff.
+  - **README:** setup steps, the Tailwind CLI download and build commands, and the test commands.
+
+  TDD covered three behaviors, each RED → approved → GREEN:
+  1. settings refuse to load without a secret key
+  2. sign-up creates a Private account and signs the user in
+  3. the navbar matches the signed-in state
+
+  All 17 tests pass, and Ruff lint and format are clean. The user confirmed manual browser verification passed.
+- **Deviations:** No recommendations were overridden, and the user approved each TDD test unchanged. Decisions made during the phase that the PRD doesn't specify:
+  - The archive folder is `archive/initial-api-verification/`, with "Initial API verification" as its README title. This settles the folder-name question left open in the design interview.
+  - The compiled stylesheet and the DaisyUI plugin file are committed. Only the CLI executable is git-ignored.
+  - Tailwind and DaisyUI are pinned to the newest releases at least two weeks old (4.3.3 and 5.7.50), not the very latest (4.3.5 and 5.8.1).
+  - `.env.example` sets `DJANGO_DEBUG=true` for local development, because with debug off Django's development server doesn't serve static files.
+  - `ALLOWED_HOSTS` is `localhost` and `127.0.0.1`, because the app runs locally only.
+  - Django-generated migrations are excluded from Ruff, and long lines are allowed in `config/settings.py`.
+  - The navbar's My Library and Settings links point at `/library/` and `/settings/` until those pages exist in Phases 3 and 6.
+- **Sideways:**
+  - The agent ran a stray `git checkout --` with no file paths while running checks. It changed nothing (it only listed modified files), and the agent said so.
+  - Ruff's first run flagged long lines in the Django-generated migration and in a settings validator path. Excluding migrations and allowing long lines in settings fixed this.
+  - The user's real `.env` had only `RAWG_API_KEY`, so the agent added a generated `DJANGO_SECRET_KEY` and `DJANGO_DEBUG=true` to the end without printing the secret.
+  - Known gaps the user was told about:
+    - My Library and Settings show "Page not found" until later phases.
+    - There's no link to the password-change page yet.
+    - The navbar test checks link text but not where the links go.
+
+## 2026-11-16 — Wrote the initial CLAUDE.md and trimmed it to stack, decisions, and document pointers
+
+### Prompts
+1. Create the initial CLAUDE.md for this project. Keep it to about 20-30 lines. Include only: 1. A one-line project description. 2. The approved technology stack and package manager. 3. Durable, project-wide architecture decisions already established in the PRD. 4. Short pointers to the PRD, plan, and prototypes instead of repeating their details. Do not add commands yet because the project tooling has not been installed or verified. Do not predict project structure, paths, template conventions, URL conventions, or testing commands that do not exist yet. Do not copy business requirements, user stories, implementation phases, rejected alternatives, or detailed feature rules into CLAUDE.md. Do not invent new architectural conventions.
+2. This CLAUDE.md is too detailed. Reduce it to about 20-30 lines. Remove feature-specific business rules and anything that predicts commands or project structure. Keep only the project description, technology stack, document pointers, and durable architecture decisions from the PRD.
+3. commit and push
+4. log this session in PROMPTS.md
+
+### Summary
+- **Outcome:** Added a 26-line `CLAUDE.md` with a one-line description and three sections:
+  - the stack (uv, Django, DRF, SQLite, Tailwind standalone CLI with DaisyUI, local HTMX, pytest with pytest-django, Ruff)
+  - seven architecture decisions from the PRD
+  - pointers to the PRD, the plan, and the sharing prototype
+
+  Committed it as `9b5986b` and pushed it to `origin/main`.
+- **Deviations:** None on recommendations. The user corrected the first draft as too detailed (prompt 2).
+- **Sideways:** The first draft broke the user's own constraints:
+  - It named the three apps, which predicts project structure.
+  - It included feature rules: the API 503, the Private-library 404, and where RAWG attribution goes.
+  - It included a command-style instruction ("use `uv`, not pip").
+  - It reworded the PRD's caching rule loosely.
+
+  The user caught this, and the second draft removed all of it. Git also warned that it will convert the file's LF line endings to CRLF. This is harmless.
+
 ## 2026-11-16 — Broke the game backlog tracker PRD into a 9-phase tracer-bullet plan and committed the design documents
 
 ### Prompts

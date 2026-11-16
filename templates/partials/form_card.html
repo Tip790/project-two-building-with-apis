@@ -1,0 +1,17 @@
+{% comment %}
+A centered card holding one form. Include with:
+  heading     - the card title
+  form        - the Django form
+  submit_label - the button text
+{% endcomment %}
+<div class="card bg-base-100 shadow-sm w-full max-w-md mx-auto">
+  <div class="card-body">
+    <h1 class="card-title text-2xl">{{ heading }}</h1>
+    <form method="post" class="form-stack">
+      {% csrf_token %}
+      {{ form.as_div }}
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+      <button type="submit" class="btn btn-primary w-full">{{ submit_label }}</button>
+    </form>
+  </div>
+</div>
