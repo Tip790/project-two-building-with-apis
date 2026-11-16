@@ -36,4 +36,21 @@
   .form-stack .errorlist {
     @apply text-sm text-error;
   }
+
+  /* The library filter bar (search, filters, sort). */
+  .filter-bar {
+    @apply grid gap-4 items-end sm:grid-cols-2 lg:grid-cols-3;
+  }
+  .filter-bar > div {
+    @apply flex flex-col gap-1;
+  }
+  .filter-bar label {
+    @apply text-sm font-medium;
+  }
+  .filter-bar input {
+    @apply input w-full;
+  }
+  .filter-bar select {
+    @apply select w-full;
+  }
 }

@@ -28,6 +28,56 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 5 (library browsing) with three TDD behaviors
+
+### Prompts
+1. `/implement` @prd/game-backlog-tracker.md @plans/game-backlog-tracker.md Implement phase 5
+2. go ahead with those three
+3. the test is right, make it pass
+4. move to the next behavior
+5. continue!
+6. move on to behavior 3
+7. make it green!
+8. continue with the rest of phase 5
+9. verification passed, add PROMPTS.md, commit to git and push
+
+### Summary
+- **Outcome:** Phase 5 of the plan is built:
+  - **Filter set:** `library/filters.py` has `EntryFilter`, shared with the shared library page (Phase 6) and the API (Phase 7). Parameters:
+    - `q`: name search that ignores case
+    - `status`
+    - `genre` and `platform`: by primary key; `platform` is the entry's own platform
+    - `min_rating`: unrated entries drop out
+    - `sort`: `added` (the default, newest first), `name` (A–Z), `rating`, `hours` and `released` (highest or newest first, blank values last)
+
+    Every order ends with `-pk`, so pages never overlap. The genre and platform dropdowns list only what's in the library being browsed.
+  - **My Library:** `/library/` shows 12 entries per page with Django's `Paginator`. Page links use `{% querystring %}`, so they keep the active filters and sort, and they're marked `rel="prev"`/`rel="next"`.
+  - **Filter bar:** a plain GET form that also submits through HTMX on submit or change. It swaps only `#library-results`, pushes the URL, and uses `hx-sync` so a newer request replaces an older one.
+  - **Results partial:** the grid moved to `templates/library/partials/library_results.html`. It adds a count, rating and hours badges, and a "No games in your library match these filters" message. History restores get the full page, and responses send `Vary: HX-Request`.
+  - **Dependencies and CSS:** `django-filter` 26.2 was added and registered. `tailwind/input.css` has `.filter-bar` styles, and `static/css/app.css` was rebuilt.
+
+  TDD covered three behaviors, each RED → approved → GREEN:
+  1. the filter set narrows entries by name search, status, genre, entry platform and minimum rating
+  2. each sort order works, and with no sort the newest entries come first
+  3. My Library shows 12 entries per page, and page links keep the active filters and sort
+
+  All 141 tests pass, and Ruff lint and format are clean. The user confirmed manual browser verification passed.
+- **Deviations:** The user approved each TDD test unchanged, and no recommendations were overridden. Decisions made during the phase that the PRD doesn't specify:
+  - Parameter names are `q`, `status`, `genre`, `platform`, `min_rating`, `sort` and `page`. Genre and platform go by primary key, not slug.
+  - Each sort has one fixed direction (no `-rating`-style reverse sorts), with blank values last.
+  - Invalid filter, sort or page values are ignored, or the nearest real page is shown, instead of returning an error.
+  - Changing a filter goes back to page 1.
+- **Sideways:**
+  - The sort test's two date-added cases passed before any sort code existed, because the model's default ordering is newest first. The other four failed on assertions, and the default no longer relies on `Meta.ordering`.
+  - The behavior 3 test first failed after GREEN code on `"Dropped" not in html`, which matched the new status dropdown's option. It was fixed mechanically to check for the game's full name, "Game 00 Dropped".
+  - A Python `read_text`/`write_text` edit used the Windows code page and garbled the en dash in "Name (A–Z)". It was caught, fixed, and every file edited that way was checked for valid UTF-8.
+  - The `entry_names` test helper first returned names in a fixed order, not page order. It was fixed before the first full run.
+  - A grep check reported the `col-span` classes missing from the compiled CSS. The rules were there; the grep pattern was wrong (third time this has happened).
+  - `PROMPTS.md` showed a stray blank line with trailing spaces that this session didn't add. It was gone by the time this entry was written.
+  - Known gaps:
+    - Nothing exercises the HTMX filter bar in a real browser (only its markup and the fragment responses are checked).
+    - Name sort compares lowercased names, which no test checks.
+
 ## 2026-11-16 — Implemented Phase 4 (entry detail, edit, and delete) with three TDD behaviors
 
 ### Prompts

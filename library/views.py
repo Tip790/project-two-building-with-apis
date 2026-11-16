@@ -1,13 +1,26 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.cache import patch_vary_headers
 
+from .filters import EntryFilter
 from .forms import EntryForm
 from .models import LibraryEntry
+
+ENTRIES_PER_PAGE = 12
 
 
 def _is_htmx(request) -> bool:
     return request.headers.get("HX-Request") == "true"
+
+
+def _wants_fragment(request) -> bool:
+    """True for HTMX swaps. History restores need the full page."""
+    return (
+        _is_htmx(request)
+        and request.headers.get("HX-History-Restore-Request") != "true"
+    )
 
 
 def _own_entry_or_404(request, pk) -> LibraryEntry:
@@ -21,13 +34,30 @@ def _own_entry_or_404(request, pk) -> LibraryEntry:
 
 @login_required
 def my_library(request):
-    """The signed-in user's saved games, newest first, from local data only."""
-    entries = (
-        LibraryEntry.objects.filter(user=request.user)
-        .select_related("game", "platform")
-        .order_by("-created_at")
+    """The signed-in user's saved games, from local data only.
+
+    Search, filters and sort come from the shared ``EntryFilter``. HTMX
+    requests get only the results grid; everything else gets the full page.
+    """
+    own_entries = LibraryEntry.objects.filter(user=request.user)
+    filterset = EntryFilter(
+        request.GET, queryset=own_entries.select_related("game", "platform")
     )
-    return render(request, "library/my_library.html", {"entries": entries})
+    page = Paginator(filterset.qs, ENTRIES_PER_PAGE).get_page(request.GET.get("page"))
+    context = {
+        "filterset": filterset,
+        "page": page,
+        "entries": page.object_list,
+        "library_is_empty": not own_entries.exists(),
+    }
+    if _wants_fragment(request):
+        template = "library/partials/library_results.html"
+    else:
+        template = "library/my_library.html"
+    response = render(request, template, context)
+    # Browsers must not reuse a cached fragment for a full page load.
+    patch_vary_headers(response, ["HX-Request"])
+    return response
 
 
 @login_required
