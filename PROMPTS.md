@@ -28,6 +28,63 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Designed the Django RAWG game backlog tracker in a 22-question interview, prototyped the sharing URLs, and wrote the PRD
+
+### Prompts
+1. `/grill-me` @project-idea.md Create a Django application that consumes an external API and provides it's own API focued on the RAWG video game API follow the tech and business requirements.  Users will find items through the external API, save selected items, and add their own information. Your application will store that information locally and make it available through a website and an API built with Django REST Framework.
+2. A, the Game backlog and progress tracker
+3. B (A's core tracker with hours played and platform) with 1–5 star rating, remove the start and finish dates from B
+4. A, two tables with Game and LibraryEntry (how data is stored locally)
+5. A, real Genre and Platform models (how to store genres and platforms)
+6. Instead of the reccommendation B: Public viewing of all librarys, do C. Selective Sharing where you selected if the library is private or public.
+7. A, custom User model with private by default
+8. `/prototype` this question
+9. back to the question, use option A, the personal URL per user with no directory
+10. A, mirror the website, with entries only (DRF API endpoints)
+11. A, send rawg_id and fetch full details from /games/<id> (how game data gets to the database)
+12. C, the HTMX on submit and i the one click add to library (How "find games on RAWG" search works)
+13. A, django-filter with HTMX results swap (library browsing)
+14. A plus (ii), built-in auth with token API (sign in) but the API tokens will be fake ones, not real ones is that okay??
+15. Meaning 1, real tokens with placeholders in docs, one Settings page (DRF tokens not API keys, my bad)
+16. C, detail page with HTMX save, and yes to read-only (how to edit or delete entries)
+17. A, keep rules 1–4 and skip 5 and 6 (Validation Rules for entries)
+18. A, move existing client with no caching, and yes to placeholder (how client code is organized, and if it is cached)
+19. A, three apps, and delete the tests and ecisting scripts, unless it would remove it from the repository, then keep but disable the code.
+20. A, move them to archive and exclude from pytest and Ruff, name archive "Initial API verification" (What happens to the earlier API tests)
+21. B, Tailwind's CLI and i, Save htmx.min.js into static/js (vendored HTMX) (In regards to how Tailwind, DaisyUI, and HTMX are added to the pages)
+22. A, pytest-django with two-level mocking (how things are tested)
+23. C, footer plus View on RAWG link, and i (attribution to list responses) (RAWG attribution/crediting)
+24. A, python-dotenv with os.environ, local-only not deployed (settings and secrets, keeping the things not commited to git in Django)
+25. A, search as home page with tagline, and yes to admin
+26. B, seed_demo management command (demo data)
+27. `/to-prd`
+28. Append a session log to PROMPTS.md at the repo root, under today's date, newest entry at the top. Record every prompt I gave you this session, in order, including any corrections. End the entry with a short summary: the outcome, any places where I deviated from a recommended answer or asked follow-up questions, and anything that went sideways.
+
+### Summary
+- **Outcome:** A 22-question design interview settled the whole design of a Django + DRF game backlog tracker built on RAWG:
+  - **Data:** custom `User` with a Private/Public library setting (Private by default); shared `Game`/`Genre`/`Platform` tables; `LibraryEntry` with status, 1–5 rating, hours played, platform and notes.
+  - **Website:** HTMX search home page with one-click add; `/library/` and `/u/<username>/` with `django-filter` browsing; detail pages with an HTMX edit form.
+  - **API:** a DRF API that mirrors the website, with token auth.
+  - **Supporting decisions:** a RAWG client moved from the old script, RAWG attribution everywhere, Tailwind standalone CLI with DaisyUI, vendored HTMX, `pytest-django` with mocked RAWG, and a `seed_demo` command.
+
+  Files written:
+  - `prototypes/library-sharing-urls.html`, a throwaway logic prototype comparing three URL layouts for sharing
+  - `prd/game-backlog-tracker.md`, with 72 user stories, implementation and testing decisions, and the out-of-scope list
+
+  No app code has been written. Nothing from this session is committed yet.
+- **Deviations:**
+  - Q2 (personal fields): chose the recommended core tracker but removed start and finish dates.
+  - Q5 (who can see a library): overrode the recommended public read-only viewing and chose selective sharing (each user picks Private or Public).
+  - Q16 (old console script): made deleting the script and tests conditional on it not removing them from the repo. Once told that deleting removes them from the current files (history keeps them), chose to move them to an archive excluded from pytest and Ruff, named "Initial API verification".
+  - Follow-up question: asked whether API tokens could be "fake." This turned out to be a mix-up between DRF tokens and external API keys, and was settled as real DRF tokens with placeholder tokens in docs and tests.
+  - Detour: used `/prototype` on the URL-layout question before answering it.
+  - Every other answer matched the recommendation.
+- **Sideways:**
+  - Node.js isn't installed, so the prototype's model couldn't be run automatically. The walkthroughs were traced by hand instead, and the prototype hasn't been confirmed by clicking through it in a browser.
+  - Dropping start and finish dates also removed the planned "finished can't be before started" check, leaving "platform must belong to the game" as the only cross-field rule.
+  - The archive folder name is unresolved. I suggested `archive/initial-api-verification/` (no spaces) with "Initial API verification" as the README title, but the choice wasn't confirmed. The PRD says only that the folder is "titled" that.
+  - The PRD assumes a Django version that supports Python 3.14, which hasn't been checked yet. It gets pinned at setup.
+
 ## 2026-11-16 — Researched game/music APIs, then designed and built a RAWG console search script with uv
 
 ### Prompts

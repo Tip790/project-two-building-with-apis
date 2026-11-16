@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Library Sharing URLs</title>
+<!-- THROWAWAY PROTOTYPE: not production code. Answers one question (see intro). -->
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --ink: #1d1d1f; --muted: #6b6b70;
+    --line: #e3e3e0; --accent: #5b4bdb; --accent-soft: #eeebff;
+    --ok: #1f7a46; --ok-soft: #e4f4ea; --warn: #9a5b00; --warn-soft: #fdf1dc;
+    --bad: #b42318; --bad-soft: #fde8e6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; }
+  p { margin: 0 0 10px; }
+  .intro { color: var(--muted); max-width: 760px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-top: 18px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+  button { font: inherit; border: 1px solid var(--line); background: #fff; color: var(--ink);
+    padding: 6px 12px; border-radius: 8px; cursor: pointer; margin: 0 6px 6px 0; }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { color: #fff; filter: brightness(1.1); }
+  button.selected { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .row { margin-bottom: 10px; }
+  .label { font-size: 13px; color: var(--muted); margin-right: 6px; }
+  .opt-desc { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; }
+  dt { color: var(--muted); font-size: 14px; }
+  dd { margin: 0; }
+  .pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; font-weight: 600; }
+  .pub { background: var(--ok-soft); color: var(--ok); }
+  .priv { background: #eee; color: #555; }
+  .changed { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .urlbar { font-family: ui-monospace, Consolas, monospace; background: #f1f1ef; border-radius: 8px; padding: 8px 10px; }
+  .status { font-weight: 700; }
+  .s200 { color: var(--ok); } .s302 { color: var(--warn); } .s404, .s403, .s401 { color: var(--bad); }
+  .page { border: 1px dashed var(--line); border-radius: 10px; padding: 12px; margin-top: 10px; min-height: 70px; }
+  .why { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); font-size: 14px; }
+  .api { margin-top: 8px; font-size: 13px; color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+  .result { padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+  .result.good { background: var(--ok-soft); } .result.blocked { background: var(--bad-soft); } .result.info { background: var(--warn-soft); }
+  ul.games { margin: 6px 0 0; padding-left: 18px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 12px; }
+  .steps ol { padding-left: 20px; margin: 8px 0 0; }
+  .steps li { margin-bottom: 6px; }
+  .steps li.done { color: var(--muted); }
+  .steps li.done button { text-decoration: line-through; }
+  .log { font-size: 13px; color: var(--muted); max-height: 160px; overflow: auto; margin: 0; padding-left: 18px; }
+  input[type=text] { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; width: 180px; margin-right: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Who sees which library, at which URL?</h1>
+  <p class="intro">
+    Throwaway prototype for the Game Backlog Tracker. Each user picks whether their library is
+    <b>Public</b> or <b>Private</b> (default: Private). This demo lets you compare three website layouts
+    and check, for every kind of visitor, what they actually get on each page.
+    Watch for anything that feels wrong, e.g. a private library leaking, or a link that behaves unexpectedly after a setting changes.
+  </p>
+
+  <section class="card">
+    <h2>1 · Choose the layout being tested</h2>
+    <div id="options"></div>
+    <div class="opt-desc" id="optDesc"></div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>2 · Current state</h2>
+      <div id="state"></div>
+    </section>
+    <section class="card">
+      <h2>What the visitor sees</h2>
+      <div id="screen"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>3 · Free play</h2>
+    <div class="row"><span class="label">Who is using the site:</span><span id="whoBtns"></span></div>
+    <div class="row"><span class="label">Signed-in user's setting:</span><span id="settingBtns"></span></div>
+    <div class="row"><span class="label">Go to page:</span><span id="visitBtns"></span>
+      <input type="text" id="customUrl" placeholder="/u/someone/"><button id="goCustom">Go</button></div>
+    <div class="row"><span class="label">Try to edit a game in:</span><span id="editBtns"></span></div>
+  </section>
+
+  <section class="card steps">
+    <h2>4 · Guided walkthroughs</h2>
+    <p class="intro" style="font-size:14px">Each walkthrough resets the demo but keeps the layout you chose above, so you can run the same story under A, B, and C and compare.</p>
+    <div class="tabs" id="tabs"></div>
+    <div id="scenario"></div>
+  </section>
+
+  <section class="card">
+    <h2>History</h2>
+    <ol class="log" id="log"></ol>
+  </section>
+</main>
+
+<script>
+/* ================= PURE MODEL (no DOM in here) ================= */
+const Model = (() => {
+  const OPTIONS = {
+    A: { name: "A · My library + share links",
+         desc: "/library/ is your own library (sign-in required). /u/<name>/ is anyone's library: shown if Public or if it's yours, otherwise Not Found. No directory." },
+    B: { name: "B · A + public directory",
+         desc: "Everything in A, plus /libraries/: a list of every user whose library is Public." },
+    C: { name: "C · One URL only",
+         desc: "No separate /library/ page. Your library lives at /u/<your-name>/ like everyone else's; /library/ just forwards you there." },
+  };
+
+  function initial(option = "A") {
+    return {
+      option,
+      viewer: null,              // username or null (signed out)
+      pendingNext: null,         // where to go after signing in
+      users: {
+        alice: { isPublic: false, games: ["Hollow Knight · Playing", "Hades · Completed", "Celeste · Want to Play"] },
+        bob:   { isPublic: true,  games: ["Elden Ring · Playing", "Stardew Valley · Completed", "Portal 2 · Completed", "Balatro · Want to Play"] },
+        carol: { isPublic: false, games: ["Tetris Effect · Dropped"] },
+      },
+      screen: { url: "/", status: 200, kind: "home", why: "Home page. Anyone can search RAWG from here." },
+      lastEdit: null,
+      log: [],
+    };
+  }
+
+  // Which API call mirrors this page, and what status it would return.
+  function apiFor(s, path, res) {
+    if (path === "/library/") return `GET /api/entries/  →  ${s.viewer ? 200 : 401}`;
+    const m = path.match(/^\/u\/([^/]+)\/$/);
+    if (m) return `GET /api/users/${m[1]}/entries/  →  ${res.status === 200 ? 200 : 404}`;
+    if (path === "/libraries/") return s.option === "B" ? "GET /api/libraries/  →  200 (public users only)" : "GET /api/libraries/  →  404";
+    return null;
+  }
+
+  // What happens when the current visitor requests a URL. Pure lookup.
+  function resolve(s, path) {
+    const v = s.viewer;
+    if (path === "/" ) return { status: 200, kind: "home", why: "Home page. Anyone can search RAWG from here." };
+    if (path.startsWith("/login/")) return { status: 200, kind: "login", why: "Sign-in page. After signing in you are sent back to the page you wanted." };
+
+    if (path === "/library/") {
+      if (!v) return { status: 302, to: "/login/?next=/library/", why: "“My library” needs you to be signed in, so you're sent to the sign-in page first." };
+      if (s.option === "C") return { status: 302, to: `/u/${v}/`, why: `Layout C has no separate “My library” page, so /library/ forwards you to /u/${v}/.` };
+      return { status: 200, kind: "library", owner: v, canEdit: true, why: "Your own library. Edit buttons are shown." };
+    }
+
+    if (path === "/libraries/") {
+      if (s.option !== "B") return { status: 404, kind: "notfound", why: "This layout has no directory page." };
+      const list = Object.keys(s.users).filter(n => s.users[n].isPublic);
+      return { status: 200, kind: "directory", list, why: "The directory lists only Public libraries. Private users are not mentioned at all." };
+    }
+
+    const m = path.match(/^\/u\/([^/]+)\/$/);
+    if (m) {
+      const name = m[1], u = s.users[name];
+      if (!u) return { status: 404, kind: "notfound", why: `No user called “${name}”. This Not Found page is identical to the one for a Private library, so nobody can tell whether an account exists.` };
+      if (name === v) return { status: 200, kind: "library", owner: name, canEdit: true,
+        why: u.isPublic ? "Your library. Other people see this same page, read-only." : "Your library is Private. Only you can open this page; everyone else gets Not Found." };
+      if (u.isPublic) return { status: 200, kind: "library", owner: name, canEdit: false, why: `${name}'s library is Public: anyone can view it, but only ${name} can change it.` };
+      return { status: 404, kind: "notfound", why: `${name}'s library is Private. Visitors get Not Found, the same page shown for a user who doesn't exist.` };
+    }
+    return { status: 404, kind: "notfound", why: "No such page." };
+  }
+
+  function go(s, path) {
+    let res = resolve(s, path), url = path, hops = [];
+    while (res.status === 302) {           // follow redirects
+      hops.push(`${url} → ${res.to}`);
+      if (res.to.startsWith("/login/")) s = { ...s, pendingNext: path };
+      url = res.to; res = resolve(s, res.to);
+    }
+    const screen = { url, ...res, requested: path, hops, api: apiFor(s, path, resolve(s, path)) };
+    return { ...s, screen };
+  }
+
+  function editAttempt(s, owner) {
+    const v = s.viewer, u = s.users[owner];
+    const visible = u.isPublic || owner === v;
+    if (!v) return { ok: false, web: "Sent to sign-in page", api: `PATCH /api/entries/… → 401`, why: "You must be signed in to change anything." };
+    if (v === owner) return { ok: true, web: "Saved ✔", api: `PATCH /api/entries/… → 200`, why: "You own this library, so the change is saved." };
+    if (visible) return { ok: false, web: "Forbidden (403)", api: `PATCH /api/entries/… → 403`, why: `You can see ${owner}'s Public library, but you are not the owner, so you can't change it.` };
+    return { ok: false, web: "Not Found (404)", api: `PATCH /api/entries/… → 404`, why: `${owner}'s library is Private, so to you it doesn't exist. 404 rather than 403 avoids confirming it's there.` };
+  }
+
+  function reduce(s, a) {
+    const log = (msg) => [...s.log, msg];
+    switch (a.type) {
+      case "setOption": { const n = initial(a.option); return { ...n, log: [`Switched to layout ${a.option} (demo reset)`] }; }
+      case "reset":     return { ...initial(s.option), log: [`Reset (layout ${s.option})`] };
+      case "signIn": {
+        let n = { ...s, viewer: a.user, lastEdit: null, log: log(`${a.user} signed in`) };
+        if (s.pendingNext) { const next = s.pendingNext; n = go({ ...n, pendingNext: null }, next); n.log = [...n.log, `…and was sent back to ${next}`]; }
+        else n = go(n, s.screen.requested || s.screen.url);
+        return n;
+      }
+      case "signOut": return go({ ...s, viewer: null, pendingNext: null, lastEdit: null, log: log(`${s.viewer} signed out`) }, s.screen.requested || "/");
+      case "setPublic": {
+        if (!s.viewer) return { ...s, log: log("Tried to change sharing while signed out: not possible") };
+        const users = { ...s.users, [s.viewer]: { ...s.users[s.viewer], isPublic: a.value } };
+        const n = { ...s, users, log: log(`${s.viewer} set their library to ${a.value ? "Public" : "Private"}`) };
+        return go(n, s.screen.requested || s.screen.url);   // re-check the page they're on
+      }
+      case "visit": return go({ ...s, lastEdit: null, log: log(`${s.viewer || "Signed-out visitor"} opened ${a.path}`) }, a.path);
+      case "tryEdit": {
+        const r = editAttempt(s, a.owner);
+        return { ...s, lastEdit: { owner: a.owner, ...r }, log: log(`${s.viewer || "Signed-out visitor"} tried to edit a game in ${a.owner}'s library → ${r.web}`) };
+      }
+    }
+    return s;
+  }
+
+  return { OPTIONS, initial, reduce };
+})();
+
+/* ================= SCENARIOS (data only) ================= */
+const SCENARIOS = [
+  { title: "Sharing a link", desc: "Bob's library is Public. He sends his link to a friend who isn't signed in. Watch: the friend can view, but sees no edit buttons.",
+    steps: [ ["Friend opens Bob's link", { type: "visit", path: "/u/bob/" }],
+             ["Friend tries to edit one of Bob's games", { type: "tryEdit", owner: "bob" }] ] },
+  { title: "Private stays private", desc: "Alice's library is Private (the default). Watch: a stranger gets Not Found, but Alice herself sees everything at the very same URL.",
+    steps: [ ["Stranger opens /u/alice/", { type: "visit", path: "/u/alice/" }],
+             ["Alice signs in", { type: "signIn", user: "alice" }],
+             ["Alice opens /u/alice/", { type: "visit", path: "/u/alice/" }] ] },
+  { title: "Private vs. doesn't exist", desc: "Can a stranger tell a Private account apart from no account at all? Watch: the two answers should look exactly the same.",
+    steps: [ ["Open /u/carol/ (Private)", { type: "visit", path: "/u/carol/" }],
+             ["Open /u/nobody/ (no such user)", { type: "visit", path: "/u/nobody/" }] ] },
+  { title: "Un-sharing", desc: "Bob shared his link, then changes his mind. Watch: the old link stops working immediately. Under layout B, also watch Bob disappear from the directory.",
+    steps: [ ["Stranger opens /u/bob/ (works)", { type: "visit", path: "/u/bob/" }],
+             ["Bob signs in", { type: "signIn", user: "bob" }],
+             ["Bob sets his library to Private", { type: "setPublic", value: false }],
+             ["Bob signs out", { type: "signOut" }],
+             ["Open /u/bob/ again", { type: "visit", path: "/u/bob/" }],
+             ["Open the directory /libraries/", { type: "visit", path: "/libraries/" }] ] },
+  { title: "Sign-in redirect", desc: "A signed-out visitor clicks “My library”. Watch where they land after signing in. Layout C behaves differently from A and B.",
+    steps: [ ["Signed-out visitor opens /library/", { type: "visit", path: "/library/" }],
+             ["Carol signs in", { type: "signIn", user: "carol" }] ] },
+  { title: "Snooping on a neighbour", desc: "Alice is signed in and tries to change games in Bob's Public library, then in Carol's Private one. Both should be refused, but with different answers.",
+    steps: [ ["Alice signs in", { type: "signIn", user: "alice" }],
+             ["Alice opens /u/bob/", { type: "visit", path: "/u/bob/" }],
+             ["Alice tries to edit Bob's game", { type: "tryEdit", owner: "bob" }],
+             ["Alice tries to edit Carol's game", { type: "tryEdit", owner: "carol" }] ] },
+];
+
+/* ================= PAGE SHELL ================= */
+let state = Model.initial("A");
+let prev = state;
+let tab = 0, stepIdx = 0;
+
+function dispatch(action) { prev = state; state = Model.reduce(state, action); render(); }
+const $ = (id) => document.getElementById(id);
+const btn = (label, onClick, cls = "", disabled = false) => {
+  const b = document.createElement("button"); b.textContent = label; b.className = cls; b.disabled = disabled; b.onclick = onClick; return b;
+};
+const esc = (t) => String(t).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+function render() {
+  // options
+  const o = $("options"); o.innerHTML = "";
+  for (const k of Object.keys(Model.OPTIONS))
+    o.appendChild(btn(Model.OPTIONS[k].name, () => { dispatch({ type: "setOption", option: k }); stepIdx = 0; render(); }, state.option === k ? "selected" : ""));
+  $("optDesc").textContent = Model.OPTIONS[state.option].desc;
+
+  // state panel
+  const ch = (cond) => cond ? ' class="changed"' : "";
+  const userRows = Object.entries(state.users).map(([n, u]) =>
+    `<dt>${n}'s library</dt><dd><span${ch(prev.users[n] && prev.users[n].isPublic !== u.isPublic)}><span class="pill ${u.isPublic ? "pub" : "priv"}">${u.isPublic ? "Public" : "Private"}</span></span> · ${u.games.length} games</dd>`).join("");
+  $("state").innerHTML = `<dl>
+      <dt>Layout</dt><dd>${esc(Model.OPTIONS[state.option].name)}</dd>
+      <dt>Signed in as</dt><dd><span${ch(prev.viewer !== state.viewer)}>${state.viewer ? "<b>" + state.viewer + "</b>" : "nobody (signed out)"}</span></dd>
+      ${userRows}
+      <dt>After sign-in, go to</dt><dd>${state.pendingNext ? esc(state.pendingNext) : "—"}</dd>
+    </dl>`;
+
+  // screen
+  const s = state.screen, changed = prev.screen !== s;
+  let page = "";
+  if (s.kind === "library") {
+    const u = state.users[s.owner];
+    page = `<b>${s.owner}'s game library</b> ${s.canEdit ? '<span class="pill pub">you can edit</span>' : '<span class="pill priv">read-only</span>'}
+      <ul class="games">${u.games.map(g => `<li>${esc(g)}${s.canEdit ? " &nbsp;<u>edit</u>" : ""}</li>`).join("")}</ul>`;
+  } else if (s.kind === "directory") {
+    page = `<b>Public libraries</b><ul class="games">${s.list.length ? s.list.map(n => `<li>/u/${n}/ · ${state.users[n].games.length} games</li>`).join("") : "<li><i>Nobody has a Public library yet.</i></li>"}</ul>`;
+  } else if (s.kind === "notfound") page = "<b>Page not found</b><br><span style='color:var(--muted)'>Sorry, there's nothing here.</span>";
+  else if (s.kind === "login") page = "<b>Sign in</b><br><span style='color:var(--muted)'>(Use the “Who is using the site” buttons below.)</span>";
+  else page = "<b>Home</b> · search RAWG for games…";
+  const hops = s.hops && s.hops.length ? `<div class="api">Redirected: ${s.hops.map(esc).join(" ; ")}</div>` : "";
+  let edit = "";
+  if (state.lastEdit) {
+    const e = state.lastEdit;
+    edit = `<div class="result ${e.ok ? "good" : "blocked"}" style="margin-top:10px"><b>Edit attempt on ${e.owner}'s library:</b> ${esc(e.web)}<br>${esc(e.why)}<div class="api">API: ${esc(e.api)}</div></div>`;
+  }
+  $("screen").innerHTML = `<div class="urlbar${changed ? " changed" : ""}">${esc(s.url)} &nbsp; <span class="status s${s.status}">${s.status === 200 ? "200 OK" : s.status + " Not Found"}</span></div>
+     ${hops}<div class="page">${page}</div>
+     <div class="why">${esc(s.why)}</div>
+     ${s.api ? `<div class="api">Same rule in the API: ${esc(s.api)}</div>` : ""}${edit}`;
+
+  // free-play
+  const w = $("whoBtns"); w.innerHTML = "";
+  w.appendChild(btn("Signed out", () => dispatch({ type: "signOut" }), !state.viewer ? "selected" : "", !state.viewer));
+  for (const n of Object.keys(state.users)) w.appendChild(btn(`Sign in as ${n}`, () => dispatch({ type: "signIn", user: n }), state.viewer === n ? "selected" : "", state.viewer === n));
+  const st = $("settingBtns"); st.innerHTML = "";
+  const me = state.viewer && state.users[state.viewer];
+  st.appendChild(btn("Make my library Public", () => dispatch({ type: "setPublic", value: true }), me && me.isPublic ? "selected" : "", !me));
+  st.appendChild(btn("Make my library Private", () => dispatch({ type: "setPublic", value: false }), me && !me.isPublic ? "selected" : "", !me));
+  if (!me) st.appendChild(Object.assign(document.createElement("span"), { className: "label", textContent: "(sign in first)" }));
+  const vb = $("visitBtns"); vb.innerHTML = "";
+  for (const p of ["/library/", "/libraries/", "/u/alice/", "/u/bob/", "/u/carol/", "/u/nobody/"]) vb.appendChild(btn(p, () => dispatch({ type: "visit", path: p })));
+  const eb = $("editBtns"); eb.innerHTML = "";
+  for (const n of Object.keys(state.users)) eb.appendChild(btn(`${n}'s`, () => dispatch({ type: "tryEdit", owner: n })));
+
+  // walkthroughs
+  const t = $("tabs"); t.innerHTML = "";
+  SCENARIOS.forEach((sc, i) => t.appendChild(btn(sc.title, () => { tab = i; stepIdx = 0; dispatch({ type: "reset" }); }, i === tab ? "selected" : "")));
+  const sc = SCENARIOS[tab];
+  const box = $("scenario"); box.innerHTML = `<p>${esc(sc.desc)}</p>`;
+  box.appendChild(btn("Restart this walkthrough", () => { stepIdx = 0; dispatch({ type: "reset" }); }));
+  const ol = document.createElement("ol");
+  sc.steps.forEach(([label, action], i) => {
+    const li = document.createElement("li"); if (i < stepIdx) li.className = "done";
+    li.appendChild(btn(label, () => { stepIdx = i + 1; dispatch(action); }, i === stepIdx ? "primary" : "", i !== stepIdx));
+    ol.appendChild(li);
+  });
+  box.appendChild(ol);
+  if (stepIdx >= sc.steps.length) box.appendChild(Object.assign(document.createElement("div"), { className: "result info", textContent: "Walkthrough finished. Switch layouts at the top and run it again to compare." }));
+
+  // log
+  $("log").innerHTML = state.log.map(l => `<li>${esc(l)}</li>`).join("");
+}
+
+$("goCustom").onclick = () => { let p = $("customUrl").value.trim(); if (!p) return; if (!p.startsWith("/")) p = "/" + p; if (!p.endsWith("/")) p += "/"; dispatch({ type: "visit", path: p }); };
+render();
+</script>
+</body>
+</html>
